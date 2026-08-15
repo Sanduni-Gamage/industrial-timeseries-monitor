@@ -1,0 +1,305 @@
+<!-- Data quality report template.
+     Self-contained: no external CSS, fonts or scripts, so the file can be emailed,
+     archived or opened from a share without anything else being available. -->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Data Quality Report - {{ equipment.code }}</title>
+<style>
+  :root {
+    --bg: #f6f7f9; --card: #ffffff; --ink: #1b1f24; --muted: #5b6673;
+    --line: #dfe3e8; --ok: #1a7f4b; --warn: #a86400; --crit: #b3261e;
+    --ok-bg: #e7f4ed; --warn-bg: #fdf3e2; --crit-bg: #fdeceb;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; padding: 32px 24px; background: var(--bg); color: var(--ink);
+         font: 15px/1.55 -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+  .wrap { max-width: 1080px; margin: 0 auto; }
+  header { margin-bottom: 28px; }
+  h1 { font-size: 26px; margin: 0 0 6px; letter-spacing: -0.01em; }
+  h2 { font-size: 18px; margin: 32px 0 12px; letter-spacing: -0.01em; }
+  .sub { color: var(--muted); font-size: 14px; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 10px;
+          padding: 18px 20px; margin-bottom: 16px; }
+  .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+           gap: 12px; margin-bottom: 8px; }
+  .tile { background: var(--card); border: 1px solid var(--line); border-radius: 10px;
+          padding: 14px 16px; }
+  .tile .label { font-size: 12px; text-transform: uppercase; letter-spacing: .05em;
+                 color: var(--muted); margin-bottom: 6px; }
+  .tile .value { font-size: 24px; font-weight: 600; font-variant-numeric: tabular-nums; }
+  .tile .note { font-size: 12px; color: var(--muted); margin-top: 4px; }
+  table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--line); }
+  th { font-size: 12px; text-transform: uppercase; letter-spacing: .04em;
+       color: var(--muted); font-weight: 600; }
+  td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+  .pill { display: inline-block; padding: 2px 9px; border-radius: 999px;
+          font-size: 12px; font-weight: 600; }
+  .pill.ok { background: var(--ok-bg); color: var(--ok); }
+  .pill.warn { background: var(--warn-bg); color: var(--warn); }
+  .pill.crit { background: var(--crit-bg); color: var(--crit); }
+  .scroll { overflow-x: auto; }
+  .note { color: var(--muted); font-size: 13px; }
+  .kv { display: grid; grid-template-columns: 220px 1fr; gap: 6px 16px; font-size: 14px; }
+  .kv dt { color: var(--muted); }
+  .kv dd { margin: 0; font-variant-numeric: tabular-nums; word-break: break-all; }
+  code { background: #eef1f4; padding: 1px 5px; border-radius: 4px; font-size: 13px; }
+  footer { margin-top: 36px; padding-top: 16px; border-top: 1px solid var(--line);
+           color: var(--muted); font-size: 13px; }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg:#14171a; --card:#1c2024; --ink:#e6e8ea; --muted:#9aa4b0; --line:#2c3238;
+            --ok:#5cd08e; --warn:#e0a33a; --crit:#f2857d;
+            --ok-bg:#14301f; --warn-bg:#332711; --crit-bg:#3a1c19; }
+    code { background: #262b30; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <h1>Data Quality Report</h1>
+  <div class="sub">
+    {{ equipment.name }} ({{ equipment.code }}) &middot;
+    archive {{ archive.min_ts }} to {{ archive.max_ts }} &middot;
+    generated {{ generated_utc }} UTC
+  </div>
+</header>
+
+<div class="tiles">
+  <div class="tile">
+    <div class="label">Readings stored</div>
+    <div class="value">{{ "{:,}".format(archive.readings) }}</div>
+    <div class="note">{{ "{:,}".format(archive.scans) }} scans &times; {{ archive.sensors }} sensors</div>
+  </div>
+  <div class="tile">
+    <div class="label">Trusted readings</div>
+    <div class="value">{{ "%.2f"|format(quality.good_pct) }}%</div>
+    <div class="note">{{ "{:,}".format(quality.good) }} marked GOOD</div>
+  </div>
+  <div class="tile">
+    <div class="label">Held (frozen) readings</div>
+    <div class="value">{{ "%.2f"|format(quality.stale_pct) }}%</div>
+    <div class="note">{{ "{:,}".format(quality.stale) }} not fresh measurements</div>
+  </div>
+  <div class="tile">
+    <div class="label">Timeline coverage</div>
+    <div class="value">{{ "%.1f"|format(archive.coverage_pct) }}%</div>
+    <div class="note">{{ "{:,}".format(gaps.count) }} gaps over {{ gap_threshold }}s</div>
+  </div>
+  <div class="tile">
+    <div class="label">Rows quarantined</div>
+    <div class="value">{{ "{:,}".format(quality.rejected) }}</div>
+    <div class="note">kept verbatim, never deleted</div>
+  </div>
+  <div class="tile">
+    <div class="label">Last successful ingestion</div>
+    <div class="value" style="font-size:16px">{{ last_run.completed or "never" }}</div>
+    <div class="note">run #{{ last_run.id }} &middot; {{ last_run.status }}</div>
+  </div>
+</div>
+
+<h2>What this report does and does not claim</h2>
+<div class="card">
+  <p class="note" style="margin-top:0">
+    The source metadata declares <code>has_missing_values: no</code>, and cell-wise that is
+    true &mdash; there is not one null in {{ "{:,}".format(archive.readings) }} readings.
+    <strong>Completeness is not correctness.</strong>
+    {{ "{:,}".format(quality.stale) }} readings ({{ "%.2f"|format(quality.stale_pct) }}%)
+    are a data-acquisition freeze: every analogue signal repeating the previous scan
+    exactly. Those values are plausible and inside range, so a null check and a range
+    check both pass them. Only a change-detection check finds them.
+  </p>
+  <p class="note">
+    Nothing failing validation is deleted. Bad values are stored with a quality code;
+    rows that cannot be keyed at all go to <code>ops.RejectedRow</code> with their
+    original content and a reason.
+  </p>
+</div>
+
+<h2>Quality code distribution</h2>
+<div class="card scroll">
+  <table>
+    <thead><tr>
+      <th>Code</th><th>Family</th><th>Usable</th>
+      <th class="num">Readings</th><th class="num">Share</th><th>Meaning</th>
+    </tr></thead>
+    <tbody>
+    {% for row in quality.by_code %}
+      <tr>
+        <td><code>{{ row.code }}</code></td>
+        <td><span class="pill {{ 'ok' if row.family == 'GOOD' else ('warn' if row.family == 'UNCERTAIN' else 'crit') }}">{{ row.family }}</span></td>
+        <td>{{ "yes" if row.usable else "no" }}</td>
+        <td class="num">{{ "{:,}".format(row.n) }}</td>
+        <td class="num">{{ "%.3f"|format(row.pct) }}%</td>
+        <td class="note">{{ row.description }}</td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<h2>Issues detected during ingestion</h2>
+<div class="card scroll">
+  {% if quality.issues %}
+  <table>
+    <thead><tr>
+      <th>Issue</th><th>Severity</th>
+      <th class="num">Occurrences</th><th class="num">Events recorded</th>
+      <th>Disposition</th>
+    </tr></thead>
+    <tbody>
+    {% for row in quality.issues %}
+      <tr>
+        <td><code>{{ row.issue_type }}</code></td>
+        <td><span class="pill {{ 'crit' if row.severity == 'CRITICAL' else ('warn' if row.severity == 'WARNING' else 'ok') }}">{{ row.severity }}</span></td>
+        <td class="num">{{ "{:,}".format(row.affected) }}</td>
+        <td class="num">{{ "{:,}".format(row.details) }}</td>
+        <td class="note">{{ row.disposition }}</td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  <p class="note">
+    Counts come from summary rows only. Detail and summary rows share
+    <code>ops.DataQualityIssue</code>, so adding both together double-counts every issue.
+  </p>
+  {% else %}
+  <p class="note" style="margin:0">No issues recorded.</p>
+  {% endif %}
+</div>
+
+<h2>Ten longest gaps in the archive</h2>
+<div class="card scroll">
+  <table>
+    <thead><tr>
+      <th>Gap start</th><th>Gap end</th>
+      <th class="num">Hours</th><th class="num">Scans missing (est.)</th>
+    </tr></thead>
+    <tbody>
+    {% for g in gaps.longest %}
+      <tr>
+        <td>{{ g.start }}</td><td>{{ g.end }}</td>
+        <td class="num">{{ "%.2f"|format(g.hours) }}</td>
+        <td class="num">{{ "{:,}".format(g.missing) }}</td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  <p class="note">
+    A gap is any interval longer than {{ gap_threshold }}s, which is three times the
+    measured 10s modal sampling interval. The archive shows a wide spread of intervals
+    (9s, 10s, 12s, 13s) from logger jitter, so an exact-interval test would report about
+    a million false gaps.
+  </p>
+</div>
+
+<h2>Per-sensor quality</h2>
+<div class="card scroll">
+  <table>
+    <thead><tr>
+      <th>Sensor</th><th>Class</th><th>Unit</th>
+      <th class="num">Readings</th><th class="num">Good</th><th class="num">Held</th>
+      <th class="num">Observed min</th><th class="num">Observed max</th>
+      <th class="num">Limits</th>
+    </tr></thead>
+    <tbody>
+    {% for s in sensors %}
+      <tr>
+        <td><code>{{ s.code }}</code></td>
+        <td>{{ s.sensor_class }}</td>
+        <td>{{ s.unit or "&mdash;" }}</td>
+        <td class="num">{{ "{:,}".format(s.readings) }}</td>
+        <td class="num">{{ "%.2f"|format(s.good_pct) }}%</td>
+        <td class="num">{{ "%.2f"|format(s.stale_pct) }}%</td>
+        <td class="num">{{ "%.4g"|format(s.min_value) }}</td>
+        <td class="num">{{ "%.4g"|format(s.max_value) }}</td>
+        <td class="num note">{{ "%.4g"|format(s.physical_min) }} … {{ "%.4g"|format(s.physical_max) }}</td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  <p class="note">
+    Pressure limits are deliberately negative. These are gauge pressures with a small
+    zero offset that the sensor reports whenever the compressor is unloaded; a
+    <code>Value &gt;= 0</code> constraint would reject 84% of <code>TP2</code> readings as
+    invalid when they are correct.
+  </p>
+</div>
+
+<h2>Frozen data blocks</h2>
+<div class="card scroll">
+  {% if frozen %}
+  <table>
+    <thead><tr>
+      <th>Window start</th><th>Window end</th>
+      <th class="num">Scans held</th><th class="num">Hours</th>
+    </tr></thead>
+    <tbody>
+    {% for b in frozen %}
+      <tr>
+        <td>{{ b.start }}</td><td>{{ b.end }}</td>
+        <td class="num">{{ "{:,}".format(b.scans) }}</td>
+        <td class="num">{{ "%.2f"|format(b.hours) }}</td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p class="note" style="margin:0">No frozen blocks recorded.</p>
+  {% endif %}
+</div>
+
+<h2>Ingestion history</h2>
+<div class="card scroll">
+  <table>
+    <thead><tr>
+      <th class="num">Run</th><th>Status</th><th>Started (UTC)</th>
+      <th class="num">Seconds</th><th class="num">Source rows</th>
+      <th class="num">Inserted</th><th class="num">Already present</th>
+      <th class="num">Quarantined</th>
+    </tr></thead>
+    <tbody>
+    {% for r in runs %}
+      <tr>
+        <td class="num">{{ r.id }}</td>
+        <td><span class="pill {{ 'ok' if r.status in ('SUCCEEDED','SKIPPED') else ('warn' if r.status == 'PARTIAL' else 'crit') }}">{{ r.status }}</span></td>
+        <td>{{ r.started }}</td>
+        <td class="num">{{ r.seconds if r.seconds is not none else "&mdash;" }}</td>
+        <td class="num">{{ "{:,}".format(r.rows_read) }}</td>
+        <td class="num">{{ "{:,}".format(r.inserted) }}</td>
+        <td class="num">{{ "{:,}".format(r.skipped) }}</td>
+        <td class="num">{{ "{:,}".format(r.rejected) }}</td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  <p class="note">
+    A re-run inserting zero rows is the pipeline working correctly: loading is idempotent,
+    keyed on <code>(SensorId, ReadingTs)</code>, with a SHA-256 short-circuit for a file
+    already ingested.
+  </p>
+</div>
+
+<h2>Source</h2>
+<div class="card">
+  <dl class="kv">
+    <dt>File</dt><dd>{{ source.file }}</dd>
+    <dt>SHA-256</dt><dd><code>{{ source.sha256 }}</code></dd>
+    <dt>Size</dt><dd>{{ "{:,}".format(source.bytes) }} bytes</dd>
+    <dt>Dataset</dt><dd>UCI MetroPT-3 (DOI 10.24432/C5VW3R)</dd>
+  </dl>
+</div>
+
+<footer>
+  Generated by <code>scripts/generate_quality_report.py</code>.
+  Reproduce with <code>python scripts/generate_quality_report.py</code>.
+  Methodology: <code>docs/DATA_PROFILE.md</code>, <code>docs/SQL_DESIGN.md</code> §6.
+</footer>
+
+</div>
+</body>
+</html>

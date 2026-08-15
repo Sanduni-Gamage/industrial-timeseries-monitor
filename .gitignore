@@ -1,0 +1,63 @@
+# --- Data: never commit the dataset (hundreds of MB) ---
+data/raw/*
+data/processed/*
+!data/raw/.gitkeep
+!data/processed/.gitkeep
+!data/README.md
+*.csv
+*.zip
+*.parquet
+
+# --- Secrets / config ---
+.env
+.env.local
+*.pfx
+*.key
+
+# --- Python ---
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+coverage.xml
+htmlcov/
+
+# --- Node / frontend ---
+node_modules/
+dashboard/dist/
+dashboard/.vite/
+npm-debug.log*
+
+# Generated from the FastAPI app by `python scripts/export_openapi.py` and
+# `npm run gen:types`. Committed rather than ignored: a reviewer cloning the repo
+# should be able to typecheck the dashboard without a database or a running API.
+!dashboard/src/api/openapi.json
+!dashboard/src/api/schema.d.ts
+
+# --- Generated output ---
+logs/*
+!logs/.gitkeep
+reports/*.html
+reports/figures/*
+!reports/.gitkeep
+
+# Screenshots are committed; the folder's guide must survive an empty checkout.
+!docs/screenshots/
+!docs/screenshots/*.png
+!docs/screenshots/README.md
+
+# --- Editors / OS ---
+.vs/
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+.idea/
+Thumbs.db
+desktop.ini
+.claude/
+docs/

@@ -1,0 +1,56 @@
+# SQL Server for reviewers who have Docker but not a local SQL Server install.
+#
+# HONEST NOTE: this project was developed against a natively installed SQL Server 2025
+# Express. Docker is not installed on the development machine, so this file has NOT been
+# exercised here. It is provided because a reviewer's setup is more likely to be the other
+# way round, and it is short enough to be worth including with that caveat attached.
+#
+# Usage:
+#   1. Set a password below (or export MSSQL_SA_PASSWORD).
+#   2. docker compose up -d
+#   3. In .env set:
+#        DB_SERVER=localhost,1433
+#        DB_TRUSTED_CONNECTION=false
+#        DB_USERNAME=sa
+#        DB_PASSWORD=<the same password>
+#   4. Continue from "Setup" in the README.
+#
+# The API and dashboard are deliberately NOT containerised. They are developed and run
+# locally, and a compose file that pretends otherwise would be untested scaffolding.
+
+services:
+  sqlserver:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    container_name: itm-sqlserver
+    environment:
+      ACCEPT_EULA: "Y"
+      # Never commit a real password. Supply it in the environment:
+      #   $env:MSSQL_SA_PASSWORD = "..."   (PowerShell)
+      #   export MSSQL_SA_PASSWORD=...     (bash)
+      MSSQL_SA_PASSWORD: ${MSSQL_SA_PASSWORD:?set MSSQL_SA_PASSWORD before starting}
+      # Developer edition: same feature set as Enterprise, licensed for non-production,
+      # and without Express's 10 GB per-database cap.
+      MSSQL_PID: Developer
+    ports:
+      - "1433:1433"
+    volumes:
+      # A named volume, so `docker compose down` does not discard an 18-minute load.
+      - mssql-data:/var/opt/mssql
+    healthcheck:
+      # sqlcmd moved under /opt/mssql-tools18 in recent images, and -C is required
+      # because the server presents a self-signed certificate.
+      test:
+        [
+          "CMD-SHELL",
+          "/opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P \"$$MSSQL_SA_PASSWORD\" -C -Q 'SELECT 1' || exit 1",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      # SQL Server takes a while to come up on first start; without this the healthcheck
+      # fails several times before the server is even listening.
+      start_period: 60s
+    restart: unless-stopped
+
+volumes:
+  mssql-data:

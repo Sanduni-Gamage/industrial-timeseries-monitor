@@ -1,0 +1,143 @@
+.status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border-radius: 999px;
+  font-weight: 600;
+  white-space: nowrap;
+  /* The label stays in ink; only the glyph and the wash carry colour. */
+  color: var(--ink);
+}
+
+.status-md {
+  padding: 4px 12px 4px 6px;
+  font-size: 13px;
+}
+.status-sm {
+  padding: 2px 9px 2px 4px;
+  font-size: 12px;
+}
+
+.status-glyph {
+  display: grid;
+  place-items: center;
+  width: 17px;
+  height: 17px;
+  border-radius: 50%;
+  font-size: 11px;
+  font-weight: 700;
+  color: #fff;
+  flex: none;
+}
+
+.status-good {
+  background: var(--status-good-bg);
+}
+.status-good .status-glyph {
+  background: var(--status-good);
+}
+
+.status-warning {
+  background: var(--status-warning-bg);
+}
+.status-warning .status-glyph {
+  background: var(--status-warning);
+  color: #1a1a19; /* the warning yellow is too light for white text */
+}
+
+.status-critical {
+  background: var(--status-critical-bg);
+}
+.status-critical .status-glyph {
+  background: var(--status-critical);
+}
+
+.status-neutral {
+  background: var(--status-neutral-bg);
+}
+.status-neutral .status-glyph {
+  background: var(--ink-muted);
+}
+
+/* --- stat tiles ----------------------------------------------------------- */
+
+.tile {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 14px 16px;
+  min-width: 0;
+}
+
+.tile-link {
+  text-decoration: none;
+  color: inherit;
+}
+.tile-link:hover {
+  border-color: var(--ink-muted);
+}
+
+.tile-label {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--ink-muted);
+  font-weight: 600;
+}
+
+.tile-value {
+  font-size: 26px;
+  font-weight: 600;
+  line-height: 1.15;
+  letter-spacing: -0.02em;
+}
+
+.tile-note {
+  font-size: 12px;
+  color: var(--ink-muted);
+}
+
+/* Tone tints the number itself. It is always accompanied by a word in the note or
+ * label, so the colour is reinforcement rather than the only signal. */
+.tone-good {
+  color: var(--status-good);
+}
+.tone-warning {
+  color: var(--status-warning);
+}
+.tone-critical {
+  color: var(--status-critical);
+}
+
+/* --- share bar ------------------------------------------------------------ */
+
+.sharebar {
+  height: 6px;
+  background: var(--status-neutral-bg);
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.sharebar-fill {
+  height: 100%;
+  border-radius: 999px;
+  background: var(--series-1);
+}
+.sharebar-fill.tone-good {
+  background: var(--status-good);
+}
+.sharebar-fill.tone-warning {
+  background: var(--status-warning);
+}
+.sharebar-fill.tone-critical {
+  background: var(--status-critical);
+}
+
+.tile-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 12px;
+}

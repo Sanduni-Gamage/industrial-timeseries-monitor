@@ -1,0 +1,32 @@
+# Normalise line endings so the repository is identical on Windows, Linux and macOS.
+# Without this, every file committed from Windows produces a "LF will be replaced by
+# CRLF" warning and CI on Linux can see spurious diffs.
+
+# Default: detect text, store LF in the repository, check out native.
+* text=auto
+
+# Always LF in the working tree - these are read by tools that dislike CRLF.
+*.py    text eol=lf
+*.sql   text eol=lf
+*.md    text eol=lf
+*.yml   text eol=lf
+*.yaml  text eol=lf
+*.json  text eol=lf
+*.ts    text eol=lf
+*.tsx   text eol=lf
+*.css   text eol=lf
+*.html  text eol=lf
+*.sh    text eol=lf
+
+# PowerShell keeps CRLF: Windows PowerShell 5.1 is the target, and some tooling
+# still expects CRLF in .ps1 files.
+*.ps1   text eol=crlf
+*.psm1  text eol=crlf
+
+# Never touched.
+*.csv   binary
+*.zip   binary
+*.png   binary
+*.jpg   binary
+*.pdf   binary
+*.parquet binary

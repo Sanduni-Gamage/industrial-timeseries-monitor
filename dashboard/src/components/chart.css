@@ -1,0 +1,53 @@
+.chart {
+  width: 100%;
+  min-width: 0;
+}
+
+.chart-tooltip {
+  background: var(--surface-raised);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  padding: 8px 10px;
+  font-size: 12px;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.12);
+  min-width: 190px;
+}
+
+.chart-tooltip-time {
+  color: var(--ink-muted);
+  margin-bottom: 6px;
+  font-variant-numeric: tabular-nums;
+}
+
+.chart-tooltip dl {
+  margin: 0;
+  display: grid;
+  gap: 3px;
+}
+
+.chart-tooltip dl > div {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.chart-tooltip dt {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--ink-secondary);
+}
+
+.chart-tooltip dd {
+  margin: 0;
+  font-weight: 600;
+}
+
+/* A small colour chip carries series identity next to a label that stays in ink. */
+.swatch {
+  width: 9px;
+  height: 9px;
+  border-radius: 2px;
+  flex: none;
+}

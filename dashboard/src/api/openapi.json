@@ -1,0 +1,2187 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Industrial Time-Series Monitoring API",
+    "description": "\nREST API over a historical archive of condition-monitoring data from a metro train's\ncompressor Air Production Unit (UCI MetroPT-3, DOI 10.24432/C5VW3R).\n\n**What the data is.** 22,754,220 readings - 1,516,948 scans of 15 sensors, February to\nSeptember 2020. Coverage is 82.4%: the remaining 17.6% of the timeline has no data, in\n331 recorded gaps.\n\n**Three things this API will not do to you.**\n\n* *Silently truncate.* Any series that hits a result cap is returned with\n  `truncated: true`.\n* *Hide data quality.* 3.35% of the archive is held data from a logger freeze - non-null,\n  in range, and not a measurement. It is returned with its quality code, never filtered\n  out behind your back.\n* *Return an unusable number of points.* `resolution=auto` picks raw, hourly or daily\n  from the width of the window.\n\n**Thresholds are data, not code.** Every severity boundary traces to a row in\n`analytics.SensorBaseline` or to a setpoint published by the equipment owner.\n",
+    "contact": {
+      "name": "Project documentation",
+      "url": "https://archive.ics.uci.edu/dataset/791/metropt+3+dataset"
+    },
+    "license": {
+      "name": "Dataset: UCI MetroPT-3, DOI 10.24432/C5VW3R"
+    },
+    "version": "0.2.0"
+  },
+  "paths": {
+    "/health": {
+      "get": {
+        "tags": [
+          "meta"
+        ],
+        "summary": "Liveness and dependency status",
+        "description": "Report whether the API can actually serve requests.\n\nDeliberately does **not** use the repository dependency: that dependency opens a\nconnection, so a database outage would fail before the handler ran and return a\ngeneric 503 with no detail about which component is down. The check owns its own\nconnection so it can report precisely.\n\nReturns 503 when the database is unreachable or a required table is missing, because\na monitoring system needs the status code - a body saying \"unhealthy\" behind a 200 is\nnot actionable.",
+        "operationId": "health_health_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "A required dependency is unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/anomalies": {
+      "get": {
+        "tags": [
+          "operations"
+        ],
+        "summary": "Detected anomalies",
+        "description": "Paginated anomalies, worst severity first, then most recent.\n\n``total`` is the unpaginated count, so a client can show \"23 of 1,204\" rather than\ndiscovering the end of the list by walking off it.",
+        "operationId": "list_anomalies_anomalies_get",
+        "parameters": [
+          {
+            "name": "start",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Start"
+            }
+          },
+          {
+            "name": "end",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "End"
+            }
+          },
+          {
+            "name": "sensor_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "minimum": 1
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Sensor Id"
+            }
+          },
+          {
+            "name": "severity",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/Severity"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Severity"
+            }
+          },
+          {
+            "name": "method",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "ADAPTIVE_MAD, BASELINE_IQR or SETPOINT. The same instant can be flagged by more than one rule, so filtering by method answers 'which rule fired' rather than collapsing them.",
+              "title": "Method"
+            },
+            "description": "ADAPTIVE_MAD, BASELINE_IQR or SETPOINT. The same instant can be flagged by more than one rule, so filtering by method answers 'which rule fired' rather than collapsing them."
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 1000,
+              "minimum": 1,
+              "description": "Maximum items to return.",
+              "default": 100,
+              "title": "Limit"
+            },
+            "description": "Maximum items to return."
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "Items to skip, for pagination.",
+              "default": 0,
+              "title": "Offset"
+            },
+            "description": "Items to skip, for pagination."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AnomalyPage"
+                }
+              }
+            }
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          }
+        }
+      }
+    },
+    "/failures": {
+      "get": {
+        "tags": [
+          "operations"
+        ],
+        "summary": "Documented failure events",
+        "description": "The four maintenance reports published with the dataset, verbatim.\n\nEach carries its lead-up data usability. Event #1's 24-hour run-up is 69.5% held\ndata, so any statistic computed over it would describe a frozen logger rather than a\ncompressor - the API says so rather than leaving a consumer to find out.",
+        "operationId": "list_failures_failures_get",
+        "parameters": [
+          {
+            "name": "equipment_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "minimum": 1
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Equipment Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/FailureEvent"
+                  },
+                  "title": "Response List Failures Failures Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/summary": {
+      "get": {
+        "tags": [
+          "operations"
+        ],
+        "summary": "Everything the overview screen needs",
+        "description": "One round trip for the whole Overview.\n\nA dashboard that fires eight requests to draw one screen is slower and harder to\nreason about than one endpoint answering the question the screen actually asks.",
+        "operationId": "get_summary_summary_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SystemSummary"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/data-quality": {
+      "get": {
+        "tags": [
+          "operations"
+        ],
+        "summary": "Archive quality at a glance",
+        "description": "Coverage, trust and ingestion recency.\n\n``held_readings`` is the number that matters and the one no standard check would\nsurface: values from a data-acquisition freeze are non-null and inside range, so both\na null check and a range check pass them.",
+        "operationId": "get_data_quality_data_quality_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DataQualitySummary"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/equipment": {
+      "get": {
+        "tags": [
+          "assets"
+        ],
+        "summary": "List equipment",
+        "description": "Every monitored asset, with its active sensor count.",
+        "operationId": "list_equipment_equipment_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/Equipment"
+                  },
+                  "type": "array",
+                  "title": "Response List Equipment Equipment Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/equipment/{equipment_id}": {
+      "get": {
+        "tags": [
+          "assets"
+        ],
+        "summary": "Get one piece of equipment",
+        "operationId": "get_equipment_equipment__equipment_id__get",
+        "parameters": [
+          {
+            "name": "equipment_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "title": "Equipment Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Equipment"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such resource",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/equipment/{equipment_id}/health": {
+      "get": {
+        "tags": [
+          "assets"
+        ],
+        "summary": "Current health of one piece of equipment",
+        "description": "Health over a trailing window, not over all history.\n\nAnomalies are counted across the last 24 hours of the archive. A status that only\naccumulates can never return to NORMAL, which makes it a history rather than a\nstatus.",
+        "operationId": "get_equipment_health_equipment__equipment_id__health_get",
+        "parameters": [
+          {
+            "name": "equipment_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "title": "Equipment Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EquipmentHealth"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such resource",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sensors": {
+      "get": {
+        "tags": [
+          "assets"
+        ],
+        "summary": "List sensors",
+        "description": "Sensor definitions, including the verbatim description from the dataset docs.",
+        "operationId": "list_sensors_sensors_get",
+        "parameters": [
+          {
+            "name": "equipment_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "minimum": 1
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Equipment Id"
+            }
+          },
+          {
+            "name": "sensor_class",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "pattern": "^(Analogue|Digital)$"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Sensor Class"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Sensor"
+                  },
+                  "title": "Response List Sensors Sensors Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sensors/{sensor_id}": {
+      "get": {
+        "tags": [
+          "assets"
+        ],
+        "summary": "Get one sensor",
+        "operationId": "get_sensor_sensors__sensor_id__get",
+        "parameters": [
+          {
+            "name": "sensor_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Numeric id or sensor code, e.g. 15 or TP3.",
+              "title": "Sensor Id"
+            },
+            "description": "Numeric id or sensor code, e.g. 15 or TP3."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Sensor"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such resource",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/readings/{sensor_id}": {
+      "get": {
+        "tags": [
+          "readings"
+        ],
+        "summary": "Historical readings for one sensor",
+        "description": "Return a series, choosing a resolution that a client can actually draw.\n\nThe response always states the resolution it served and whether a cap was hit, so a\ntruncated series can never be mistaken for a complete one.",
+        "operationId": "get_readings_readings__sensor_id__get",
+        "parameters": [
+          {
+            "name": "sensor_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Numeric id or sensor code, e.g. 15 or TP3.",
+              "title": "Sensor Id"
+            },
+            "description": "Numeric id or sensor code, e.g. 15 or TP3."
+          },
+          {
+            "name": "start",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Inclusive start of the window (ISO 8601). Defaults to the end of the archive minus the default window.",
+              "title": "Start"
+            },
+            "description": "Inclusive start of the window (ISO 8601). Defaults to the end of the archive minus the default window."
+          },
+          {
+            "name": "end",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Exclusive end of the window (ISO 8601).",
+              "title": "End"
+            },
+            "description": "Exclusive end of the window (ISO 8601)."
+          },
+          {
+            "name": "resolution",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/Resolution",
+              "description": "'auto' picks raw / hourly / daily from the width of the window. Ask for a specific resolution only if you need it - six months of raw data is 1.8 million points.",
+              "default": "auto"
+            },
+            "description": "'auto' picks raw / hourly / daily from the width of the window. Ask for a specific resolution only if you need it - six months of raw data is 1.8 million points."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReadingSeries"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such sensor",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Invalid time range",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/trends/{sensor_id}": {
+      "get": {
+        "tags": [
+          "readings"
+        ],
+        "summary": "Trend with rolling statistics",
+        "description": "Hourly series with a rolling mean, rolling spread and rate of change.\n\nRate of change is per hour of **elapsed** time rather than per bucket, because 17.6%\nof the archive is missing: treating a 48-hour gap as one step would report a violent\nswing where there was simply no data.",
+        "operationId": "get_trend_trends__sensor_id__get",
+        "parameters": [
+          {
+            "name": "sensor_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Numeric id or sensor code.",
+              "title": "Sensor Id"
+            },
+            "description": "Numeric id or sensor code."
+          },
+          {
+            "name": "start",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Inclusive start of the window (ISO 8601). Defaults to the end of the archive minus the default window.",
+              "title": "Start"
+            },
+            "description": "Inclusive start of the window (ISO 8601). Defaults to the end of the archive minus the default window."
+          },
+          {
+            "name": "end",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Exclusive end of the window (ISO 8601).",
+              "title": "End"
+            },
+            "description": "Exclusive end of the window (ISO 8601)."
+          },
+          {
+            "name": "operating_state",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/OperatingState"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Restrict the trend to one operating state. Strongly recommended for anything statistical: the compressor is off 54.65% of the time, so a state-blind mean blends idle and running behaviour.",
+              "title": "Operating State"
+            },
+            "description": "Restrict the trend to one operating state. Strongly recommended for anything statistical: the compressor is off 54.65% of the time, so a state-blind mean blends idle and running behaviour."
+          },
+          {
+            "name": "window_hours",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 168,
+              "minimum": 2,
+              "description": "Rolling window, in hourly buckets.",
+              "default": 24,
+              "title": "Window Hours"
+            },
+            "description": "Rolling window, in hourly buckets."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TrendSeries"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such sensor",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Invalid time range",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/readings": {
+      "get": {
+        "tags": [
+          "readings"
+        ],
+        "summary": "Readings for several sensors at once",
+        "description": "Fetch several series in one round trip, for a multi-tag chart.\n\nCapped at eight sensors. The point cap is per series, so an uncapped list would let a\nsingle request ask for 15x the ceiling.",
+        "operationId": "get_multi_readings_readings_get",
+        "parameters": [
+          {
+            "name": "sensors",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Comma-separated sensor ids or codes, e.g. 'TP2,TP3,OIL_TEMPERATURE'.",
+              "examples": [
+                "TP2,TP3"
+              ],
+              "title": "Sensors"
+            },
+            "description": "Comma-separated sensor ids or codes, e.g. 'TP2,TP3,OIL_TEMPERATURE'."
+          },
+          {
+            "name": "start",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Inclusive start of the window (ISO 8601). Defaults to the end of the archive minus the default window.",
+              "title": "Start"
+            },
+            "description": "Inclusive start of the window (ISO 8601). Defaults to the end of the archive minus the default window."
+          },
+          {
+            "name": "end",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Exclusive end of the window (ISO 8601).",
+              "title": "End"
+            },
+            "description": "Exclusive end of the window (ISO 8601)."
+          },
+          {
+            "name": "resolution",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/Resolution",
+              "default": "auto"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ReadingSeries"
+                  },
+                  "title": "Response Get Multi Readings Readings Get"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such sensor",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Invalid time range",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/limits": {
+      "get": {
+        "tags": [
+          "readings",
+          "meta"
+        ],
+        "summary": "Result caps applied by this API",
+        "description": "Publish the caps rather than letting clients discover them by being truncated.",
+        "operationId": "get_limits_limits_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "anyOf": [
+                      {
+                        "type": "integer"
+                      },
+                      {
+                        "type": "string"
+                      }
+                    ]
+                  },
+                  "type": "object",
+                  "title": "Response Get Limits Limits Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "AggregatePoint": {
+        "properties": {
+          "timestamp": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Timestamp"
+          },
+          "value": {
+            "type": "number",
+            "title": "Value",
+            "description": "Mean over the bucket."
+          },
+          "min_value": {
+            "type": "number",
+            "title": "Min Value"
+          },
+          "max_value": {
+            "type": "number",
+            "title": "Max Value"
+          },
+          "sample_count": {
+            "type": "integer",
+            "title": "Sample Count"
+          },
+          "coverage_pct": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Coverage Pct",
+            "description": "Samples present as a percentage of a fully-covered bucket at the measured 10 s interval. The archive is 82.4% covered overall, so many buckets hold fewer samples than a naive reader would assume."
+          }
+        },
+        "type": "object",
+        "required": [
+          "timestamp",
+          "value",
+          "min_value",
+          "max_value",
+          "sample_count"
+        ],
+        "title": "AggregatePoint",
+        "description": "One bucket of an aggregated series."
+      },
+      "Anomaly": {
+        "properties": {
+          "anomaly_id": {
+            "type": "integer",
+            "title": "Anomaly Id"
+          },
+          "sensor_id": {
+            "type": "integer",
+            "title": "Sensor Id"
+          },
+          "sensor_code": {
+            "type": "string",
+            "title": "Sensor Code"
+          },
+          "sensor_name": {
+            "type": "string",
+            "title": "Sensor Name"
+          },
+          "equipment_code": {
+            "type": "string",
+            "title": "Equipment Code"
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Timestamp"
+          },
+          "value": {
+            "type": "number",
+            "title": "Value"
+          },
+          "unit": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Unit"
+          },
+          "expected_low": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expected Low"
+          },
+          "expected_high": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expected High"
+          },
+          "method": {
+            "type": "string",
+            "title": "Method",
+            "description": "Which rule fired. The same instant may be flagged by more than one."
+          },
+          "score": {
+            "type": "number",
+            "title": "Score"
+          },
+          "severity": {
+            "$ref": "#/components/schemas/Severity"
+          },
+          "operating_state": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/OperatingState"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "detected_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Detected At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "anomaly_id",
+          "sensor_id",
+          "sensor_code",
+          "sensor_name",
+          "equipment_code",
+          "timestamp",
+          "value",
+          "method",
+          "score",
+          "severity",
+          "detected_at"
+        ],
+        "title": "Anomaly"
+      },
+      "AnomalyPage": {
+        "properties": {
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          },
+          "limit": {
+            "type": "integer",
+            "title": "Limit"
+          },
+          "offset": {
+            "type": "integer",
+            "title": "Offset"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/Anomaly"
+            },
+            "type": "array",
+            "title": "Items"
+          }
+        },
+        "type": "object",
+        "required": [
+          "total",
+          "limit",
+          "offset",
+          "items"
+        ],
+        "title": "AnomalyPage"
+      },
+      "ComponentHealth": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "up",
+              "down",
+              "degraded"
+            ],
+            "title": "Status"
+          },
+          "detail": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Detail"
+          },
+          "latency_ms": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Latency Ms"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "status"
+        ],
+        "title": "ComponentHealth"
+      },
+      "DataQualitySummary": {
+        "properties": {
+          "total_readings": {
+            "type": "integer",
+            "title": "Total Readings"
+          },
+          "good_readings": {
+            "type": "integer",
+            "title": "Good Readings"
+          },
+          "good_pct": {
+            "type": "number",
+            "title": "Good Pct"
+          },
+          "held_readings": {
+            "type": "integer",
+            "title": "Held Readings",
+            "description": "Readings from a data-acquisition freeze: every analogue signal repeating the previous scan. Plausible, in range, not measurements."
+          },
+          "held_pct": {
+            "type": "number",
+            "title": "Held Pct"
+          },
+          "quarantined_rows": {
+            "type": "integer",
+            "title": "Quarantined Rows"
+          },
+          "gap_count": {
+            "type": "integer",
+            "title": "Gap Count"
+          },
+          "coverage_pct": {
+            "type": "number",
+            "title": "Coverage Pct"
+          },
+          "last_successful_ingestion": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Successful Ingestion"
+          },
+          "last_ingestion_status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Ingestion Status"
+          }
+        },
+        "type": "object",
+        "required": [
+          "total_readings",
+          "good_readings",
+          "good_pct",
+          "held_readings",
+          "held_pct",
+          "quarantined_rows",
+          "gap_count",
+          "coverage_pct",
+          "last_successful_ingestion",
+          "last_ingestion_status"
+        ],
+        "title": "DataQualitySummary"
+      },
+      "Equipment": {
+        "properties": {
+          "equipment_id": {
+            "type": "integer",
+            "title": "Equipment Id"
+          },
+          "equipment_code": {
+            "type": "string",
+            "title": "Equipment Code"
+          },
+          "equipment_name": {
+            "type": "string",
+            "title": "Equipment Name"
+          },
+          "equipment_type": {
+            "type": "string",
+            "title": "Equipment Type"
+          },
+          "location": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Location"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "sensor_count": {
+            "type": "integer",
+            "title": "Sensor Count"
+          },
+          "is_active": {
+            "type": "boolean",
+            "title": "Is Active"
+          }
+        },
+        "type": "object",
+        "required": [
+          "equipment_id",
+          "equipment_code",
+          "equipment_name",
+          "equipment_type",
+          "sensor_count",
+          "is_active"
+        ],
+        "title": "Equipment"
+      },
+      "EquipmentHealth": {
+        "properties": {
+          "equipment_id": {
+            "type": "integer",
+            "title": "Equipment Id"
+          },
+          "equipment_code": {
+            "type": "string",
+            "title": "Equipment Code"
+          },
+          "equipment_name": {
+            "type": "string",
+            "title": "Equipment Name"
+          },
+          "status": {
+            "$ref": "#/components/schemas/HealthStatus"
+          },
+          "status_reason": {
+            "type": "string",
+            "title": "Status Reason",
+            "description": "Plain-language explanation. A status an operator cannot act on is not a status."
+          },
+          "sensor_count": {
+            "type": "integer",
+            "title": "Sensor Count"
+          },
+          "last_reading_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Reading At"
+          },
+          "total_readings": {
+            "type": "integer",
+            "title": "Total Readings"
+          },
+          "active_critical_anomalies": {
+            "type": "integer",
+            "title": "Active Critical Anomalies"
+          },
+          "active_warning_anomalies": {
+            "type": "integer",
+            "title": "Active Warning Anomalies"
+          },
+          "recorded_failures": {
+            "type": "integer",
+            "title": "Recorded Failures"
+          },
+          "active_window_hours": {
+            "type": "integer",
+            "title": "Active Window Hours",
+            "description": "Anomalies are counted over this trailing window of the archive, not over all history - a status that only accumulates can never return to NORMAL.",
+            "default": 24
+          }
+        },
+        "type": "object",
+        "required": [
+          "equipment_id",
+          "equipment_code",
+          "equipment_name",
+          "status",
+          "status_reason",
+          "sensor_count",
+          "last_reading_at",
+          "total_readings",
+          "active_critical_anomalies",
+          "active_warning_anomalies",
+          "recorded_failures"
+        ],
+        "title": "EquipmentHealth"
+      },
+      "FailureEvent": {
+        "properties": {
+          "failure_event_id": {
+            "type": "integer",
+            "title": "Failure Event Id"
+          },
+          "equipment_id": {
+            "type": "integer",
+            "title": "Equipment Id"
+          },
+          "equipment_code": {
+            "type": "string",
+            "title": "Equipment Code"
+          },
+          "start": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Start"
+          },
+          "end": {
+            "type": "string",
+            "format": "date-time",
+            "title": "End"
+          },
+          "duration_minutes": {
+            "type": "integer",
+            "title": "Duration Minutes"
+          },
+          "failure_type": {
+            "type": "string",
+            "title": "Failure Type"
+          },
+          "severity": {
+            "type": "string",
+            "title": "Severity"
+          },
+          "source_reference": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Reference",
+            "description": "The identifier used in the published failure table, verbatim - including its known defects."
+          },
+          "report_note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Report Note"
+          },
+          "data_quality_note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Data Quality Note"
+          },
+          "lead_up_24h_scans": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lead Up 24H Scans"
+          },
+          "lead_up_24h_stale_scans": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lead Up 24H Stale Scans"
+          },
+          "lead_up_24h_stale_pct": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lead Up 24H Stale Pct"
+          },
+          "lead_up_usability": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lead Up Usability",
+            "description": "USABLE, UNUSABLE or NO DATA. Event #1's run-up is 69.5% held data, so any statistic computed over it would describe a frozen logger."
+          }
+        },
+        "type": "object",
+        "required": [
+          "failure_event_id",
+          "equipment_id",
+          "equipment_code",
+          "start",
+          "end",
+          "duration_minutes",
+          "failure_type",
+          "severity"
+        ],
+        "title": "FailureEvent"
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "type": "array",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "title": "HTTPValidationError"
+      },
+      "HealthResponse": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "healthy",
+              "degraded",
+              "unhealthy"
+            ],
+            "title": "Status"
+          },
+          "version": {
+            "type": "string",
+            "title": "Version"
+          },
+          "checked_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Checked At"
+          },
+          "components": {
+            "items": {
+              "$ref": "#/components/schemas/ComponentHealth"
+            },
+            "type": "array",
+            "title": "Components"
+          }
+        },
+        "type": "object",
+        "required": [
+          "status",
+          "version",
+          "checked_at",
+          "components"
+        ],
+        "title": "HealthResponse",
+        "description": "Liveness plus dependency status.\n\nReturns 200 when the API itself is serving and 503 when a dependency it cannot work\nwithout is unavailable. A monitoring system needs that distinction; a body that says\n\"unhealthy\" behind a 200 is not actionable."
+      },
+      "HealthStatus": {
+        "type": "string",
+        "enum": [
+          "NORMAL",
+          "WARNING",
+          "CRITICAL",
+          "NO DATA"
+        ],
+        "title": "HealthStatus"
+      },
+      "LatestReading": {
+        "properties": {
+          "sensor_id": {
+            "type": "integer",
+            "title": "Sensor Id"
+          },
+          "sensor_code": {
+            "type": "string",
+            "title": "Sensor Code"
+          },
+          "sensor_name": {
+            "type": "string",
+            "title": "Sensor Name"
+          },
+          "sensor_class": {
+            "type": "string",
+            "title": "Sensor Class"
+          },
+          "unit": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Unit"
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Timestamp"
+          },
+          "value": {
+            "type": "number",
+            "title": "Value"
+          },
+          "quality": {
+            "type": "string",
+            "title": "Quality"
+          },
+          "quality_usable": {
+            "type": "boolean",
+            "title": "Quality Usable"
+          }
+        },
+        "type": "object",
+        "required": [
+          "sensor_id",
+          "sensor_code",
+          "sensor_name",
+          "sensor_class",
+          "unit",
+          "timestamp",
+          "value",
+          "quality",
+          "quality_usable"
+        ],
+        "title": "LatestReading"
+      },
+      "OperatingState": {
+        "type": "string",
+        "enum": [
+          "OFF",
+          "OFFLOADED",
+          "LOADED",
+          "STARTING"
+        ],
+        "title": "OperatingState"
+      },
+      "ProblemDetail": {
+        "properties": {
+          "type": {
+            "type": "string",
+            "title": "Type"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "status": {
+            "type": "integer",
+            "title": "Status"
+          },
+          "detail": {
+            "type": "string",
+            "title": "Detail"
+          },
+          "instance": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Instance"
+          }
+        },
+        "type": "object",
+        "required": [
+          "type",
+          "title",
+          "status",
+          "detail"
+        ],
+        "title": "ProblemDetail",
+        "description": "RFC 7807 problem details.\n\nA machine-readable error shape, so a client can branch on ``type`` rather than\npattern-matching prose that will be reworded eventually.",
+        "example": {
+          "detail": "start (2020-06-01T00:00:00) must be earlier than end (2020-05-01T00:00:00).",
+          "instance": "/readings/14",
+          "status": 422,
+          "title": "Invalid time range",
+          "type": "/problems/invalid-time-range"
+        }
+      },
+      "ReadingPoint": {
+        "properties": {
+          "timestamp": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Timestamp"
+          },
+          "value": {
+            "type": "number",
+            "title": "Value"
+          },
+          "quality": {
+            "type": "string",
+            "title": "Quality"
+          },
+          "quality_usable": {
+            "type": "boolean",
+            "title": "Quality Usable"
+          }
+        },
+        "type": "object",
+        "required": [
+          "timestamp",
+          "value",
+          "quality",
+          "quality_usable"
+        ],
+        "title": "ReadingPoint",
+        "description": "One point of a raw series."
+      },
+      "ReadingSeries": {
+        "properties": {
+          "sensor_id": {
+            "type": "integer",
+            "title": "Sensor Id"
+          },
+          "sensor_code": {
+            "type": "string",
+            "title": "Sensor Code"
+          },
+          "unit": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Unit"
+          },
+          "resolution": {
+            "$ref": "#/components/schemas/Resolution",
+            "description": "The resolution actually served, which may differ from the one requested when 'auto' was used or when a cap was applied."
+          },
+          "start": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Start"
+          },
+          "end": {
+            "type": "string",
+            "format": "date-time",
+            "title": "End"
+          },
+          "point_count": {
+            "type": "integer",
+            "title": "Point Count"
+          },
+          "truncated": {
+            "type": "boolean",
+            "title": "Truncated",
+            "description": "True when a result cap was reached and the series is incomplete. Never silently trimmed.",
+            "default": false
+          },
+          "points": {
+            "items": {
+              "$ref": "#/components/schemas/ReadingPoint"
+            },
+            "type": "array",
+            "title": "Points"
+          },
+          "aggregates": {
+            "items": {
+              "$ref": "#/components/schemas/AggregatePoint"
+            },
+            "type": "array",
+            "title": "Aggregates"
+          }
+        },
+        "type": "object",
+        "required": [
+          "sensor_id",
+          "sensor_code",
+          "unit",
+          "resolution",
+          "start",
+          "end",
+          "point_count"
+        ],
+        "title": "ReadingSeries"
+      },
+      "Resolution": {
+        "type": "string",
+        "enum": [
+          "auto",
+          "raw",
+          "hourly",
+          "daily"
+        ],
+        "title": "Resolution",
+        "description": "Time resolution of a series.\n\n``AUTO`` lets the server choose based on the requested window, which is what stops a\nsix-month request from trying to return 1.8 million points per sensor."
+      },
+      "Sensor": {
+        "properties": {
+          "sensor_id": {
+            "type": "integer",
+            "title": "Sensor Id"
+          },
+          "equipment_id": {
+            "type": "integer",
+            "title": "Equipment Id"
+          },
+          "sensor_code": {
+            "type": "string",
+            "title": "Sensor Code"
+          },
+          "sensor_name": {
+            "type": "string",
+            "title": "Sensor Name"
+          },
+          "sensor_class": {
+            "type": "string",
+            "enum": [
+              "Analogue",
+              "Digital"
+            ],
+            "title": "Sensor Class"
+          },
+          "measurement_type": {
+            "type": "string",
+            "title": "Measurement Type"
+          },
+          "unit": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Unit"
+          },
+          "physical_min": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Physical Min"
+          },
+          "physical_max": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Physical Max"
+          },
+          "documented_setpoint": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Documented Setpoint",
+            "description": "A setpoint published by the equipment owner (e.g. the 7 bar low-pressure switch), not a threshold chosen by this project."
+          },
+          "description": {
+            "type": "string",
+            "title": "Description",
+            "description": "Verbatim description from the dataset documentation."
+          },
+          "is_active": {
+            "type": "boolean",
+            "title": "Is Active"
+          }
+        },
+        "type": "object",
+        "required": [
+          "sensor_id",
+          "equipment_id",
+          "sensor_code",
+          "sensor_name",
+          "sensor_class",
+          "measurement_type",
+          "description",
+          "is_active"
+        ],
+        "title": "Sensor"
+      },
+      "Severity": {
+        "type": "string",
+        "enum": [
+          "NORMAL",
+          "WARNING",
+          "CRITICAL"
+        ],
+        "title": "Severity"
+      },
+      "SystemSummary": {
+        "properties": {
+          "generated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Generated At"
+          },
+          "archive_start": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Archive Start"
+          },
+          "archive_end": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Archive End"
+          },
+          "equipment_count": {
+            "type": "integer",
+            "title": "Equipment Count"
+          },
+          "sensor_count": {
+            "type": "integer",
+            "title": "Sensor Count"
+          },
+          "equipment": {
+            "items": {
+              "$ref": "#/components/schemas/EquipmentHealth"
+            },
+            "type": "array",
+            "title": "Equipment"
+          },
+          "latest_readings": {
+            "items": {
+              "$ref": "#/components/schemas/LatestReading"
+            },
+            "type": "array",
+            "title": "Latest Readings"
+          },
+          "active_anomalies": {
+            "items": {
+              "$ref": "#/components/schemas/Anomaly"
+            },
+            "type": "array",
+            "title": "Active Anomalies"
+          },
+          "recent_failures": {
+            "items": {
+              "$ref": "#/components/schemas/FailureEvent"
+            },
+            "type": "array",
+            "title": "Recent Failures"
+          },
+          "data_quality": {
+            "$ref": "#/components/schemas/DataQualitySummary"
+          }
+        },
+        "type": "object",
+        "required": [
+          "generated_at",
+          "archive_start",
+          "archive_end",
+          "equipment_count",
+          "sensor_count",
+          "equipment",
+          "latest_readings",
+          "active_anomalies",
+          "recent_failures",
+          "data_quality"
+        ],
+        "title": "SystemSummary",
+        "description": "Everything the Overview screen needs, in one call.\n\nDeliberately one round trip: a dashboard that fires eight requests to render one\nscreen is slower and harder to reason about than one endpoint that answers the\nquestion the screen actually asks."
+      },
+      "TrendPoint": {
+        "properties": {
+          "timestamp": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Timestamp"
+          },
+          "value": {
+            "type": "number",
+            "title": "Value"
+          },
+          "rolling_mean": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rolling Mean"
+          },
+          "rolling_std": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rolling Std"
+          },
+          "rate_of_change_per_hour": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rate Of Change Per Hour"
+          },
+          "sample_count": {
+            "type": "integer",
+            "title": "Sample Count"
+          }
+        },
+        "type": "object",
+        "required": [
+          "timestamp",
+          "value",
+          "sample_count"
+        ],
+        "title": "TrendPoint"
+      },
+      "TrendSeries": {
+        "properties": {
+          "sensor_id": {
+            "type": "integer",
+            "title": "Sensor Id"
+          },
+          "sensor_code": {
+            "type": "string",
+            "title": "Sensor Code"
+          },
+          "unit": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Unit"
+          },
+          "operating_state": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/OperatingState"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "When set, the trend covers only periods in this operating state. The compressor is off 54.65% of the time, so a state-blind trend blends idle and running behaviour into a number describing neither."
+          },
+          "window_hours": {
+            "type": "integer",
+            "title": "Window Hours"
+          },
+          "start": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Start"
+          },
+          "end": {
+            "type": "string",
+            "format": "date-time",
+            "title": "End"
+          },
+          "point_count": {
+            "type": "integer",
+            "title": "Point Count"
+          },
+          "points": {
+            "items": {
+              "$ref": "#/components/schemas/TrendPoint"
+            },
+            "type": "array",
+            "title": "Points"
+          },
+          "summary": {
+            "additionalProperties": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "type": "object",
+            "title": "Summary"
+          }
+        },
+        "type": "object",
+        "required": [
+          "sensor_id",
+          "sensor_code",
+          "unit",
+          "window_hours",
+          "start",
+          "end",
+          "point_count",
+          "points"
+        ],
+        "title": "TrendSeries"
+      },
+      "ValidationError": {
+        "properties": {
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "type": "array",
+            "title": "Location"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Message"
+          },
+          "type": {
+            "type": "string",
+            "title": "Error Type"
+          },
+          "input": {
+            "title": "Input"
+          },
+          "ctx": {
+            "type": "object",
+            "title": "Context"
+          }
+        },
+        "type": "object",
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError"
+      }
+    }
+  },
+  "tags": [
+    {
+      "name": "meta",
+      "description": "Health, limits and service metadata."
+    },
+    {
+      "name": "assets",
+      "description": "Equipment and sensor definitions."
+    },
+    {
+      "name": "readings",
+      "description": "Historical values and trends."
+    },
+    {
+      "name": "operations",
+      "description": "Anomalies, failures and overview."
+    }
+  ]
+}

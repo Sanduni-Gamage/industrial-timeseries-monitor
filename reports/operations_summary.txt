@@ -1,0 +1,57 @@
+﻿INDUSTRIAL TIME-SERIES MONITORING - OPERATIONS SUMMARY
+========================================================================
+Generated : 2026-09-08 14:36:53
+Database  : localhost\SQLEXPRESS01/IndustrialMonitor
+SQL Server: 17.0.1000.7
+
+EQUIPMENT
+------------------------------------------------------------------------
+  APU-01 - Metro Train Air Production Unit
+    Status            : CRITICAL
+    Sensors           : 15
+    Readings stored   : 22,754,220
+    Last reading      : 1/09/2020 3:59:50 am
+    Active critical   : 28
+    Active warnings   : 48
+    Recorded failures : 4
+
+ANOMALIES - last 30 days of the archive
+------------------------------------------------------------------------
+  RULE                   SEVERITY        COUNT
+  ADAPTIVE_MAD           CRITICAL          135
+  ADAPTIVE_MAD           WARNING            58
+  BASELINE_IQR           CRITICAL          604
+  BASELINE_IQR           WARNING         1,547
+  SETPOINT               CRITICAL           16
+  SETPOINT               WARNING             2
+  TOTAL                                  2,362
+
+  Most flagged sensors:
+    OIL_TEMPERATURE         1,213
+    TP2                       495
+    MOTOR_CURRENT             465
+    DV_PRESSURE               104
+    H1                         41
+
+DATA QUALITY
+------------------------------------------------------------------------
+  Readings stored     :     22,754,220
+  Trusted             :         96.65%  (21,991,395)
+  Held (frozen)       :          3.35%  (762,825)
+  Gaps in the archive :            331
+  Rows quarantined    :              0
+
+  Held readings are values a frozen logger repeated. They are non-null and
+  inside range, so a null check and a range check both pass them. They are
+  stored and labelled, and excluded from every baseline and average.
+
+LAST SUCCESSFUL LOAD
+------------------------------------------------------------------------
+  Run           : #2 (SUCCEEDED)
+  Completed     : 8/09/2026 12:49:42 am UTC
+  Rows inserted : 0
+  Archive covers: 1/02/2020 12:00:00 am to 1/09/2020 3:59:50 am
+
+========================================================================
+Source: UCI MetroPT-3 dataset (DOI 10.24432/C5VW3R). Historical archive,
+not a live connection to plant equipment.
