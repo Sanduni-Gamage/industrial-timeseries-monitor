@@ -1,15 +1,12 @@
 /* =====================================================================================
    Reference and master data.
-
+   
    Idempotent: every statement is a MERGE or a guarded INSERT, so re-running updates
-   descriptions in place without creating duplicates or breaking foreign keys.
-
-   Sensor descriptions are VERBATIM from the UCI dataset documentation. They are stored
-   in the database (not only in a markdown file) so the dashboard can explain a tag to an
-   operator without a lookup elsewhere, and so the provenance travels with the data.
-
-   Plausibility limits come from docs/DATA_PROFILE.md §5, set generously outside the
-   observed range. See docs/SQL_DESIGN.md §6.1 for why the pressure floors are negative.
+   descriptions in place without duplicating rows.
+   
+   Sensor descriptions are verbatim from the UCI documentation, stored in the database so
+   the dashboard can explain a tag without a lookup elsewhere. Plausibility limits come
+   from docs/DATA_PROFILE.md, set generously outside the observed range.
    ===================================================================================== */
 
 SET NOCOUNT ON;
@@ -17,11 +14,10 @@ GO
 
 /* -------------------------------------------------------------------------------------
    1. ref.QualityCode
-
-   Numeric ids follow the OPC DA convention: the Good family is 192+, Uncertain 64+,
-   Bad 0+. IsUsable answers "may analytics include this reading?" - Uncertain values are
-   real measurements of questionable trust and are included with a caveat; Bad values
-   are retained for audit but excluded from statistics.
+   
+   Ids follow OPC DA: Good 192+, Uncertain 64+, Bad 0+. IsUsable answers "may analytics
+   include this?" - Uncertain values are real measurements of questionable trust and are
+   included with a caveat; Bad values are retained for audit but excluded from statistics.
    ------------------------------------------------------------------------------------- */
 
 MERGE ref.QualityCode AS target
@@ -80,13 +76,12 @@ GO
 
 /* -------------------------------------------------------------------------------------
    3. asset.Sensor
-
-   Matched on SourceColumn, which is the immutable identity of a signal in the source
-   file. SensorCode is a display convenience and could change; the CSV header cannot.
-
-   Note DV_eletric: the spelling is wrong in the source file. It is preserved exactly in
-   SourceColumn, because silently renaming a source column is a data-lineage bug. The
-   corrected spelling lives in SensorCode and SensorName.
+   
+   Matched on SourceColumn, the immutable identity of a signal in the source file.
+   SensorCode is a display convenience and could change; the CSV header cannot.
+   
+   DV_eletric is misspelled in the source and preserved exactly, because silently renaming
+   a source column is a data-lineage bug. The corrected spelling lives in SensorCode.
    ------------------------------------------------------------------------------------- */
 
 DECLARE @EquipmentId SMALLINT =
@@ -154,13 +149,12 @@ GO
 
 /* -------------------------------------------------------------------------------------
    4. ops.FailureEvent
-
-   The four maintenance reports published alongside the dataset, entered verbatim.
-   Dates are parsed as M/D/YYYY, which is unambiguous here because the first event is
-   "4/18/2020" and there is no month 18.
-
-   DataQualityNote records our observations about the SOURCE table's defects. Those are
-   not corrections - the source values are kept exactly as published.
+   
+   The four published maintenance reports, entered verbatim. Dates parse as M/D/YYYY,
+   unambiguous because the first event is 4/18/2020 and there is no month 18.
+   
+   DataQualityNote records our observations about the source table's defects. Those are
+   notes, not corrections: the source values are kept exactly as published.
    ------------------------------------------------------------------------------------- */
 
 DECLARE @Eq SMALLINT = (SELECT EquipmentId FROM asset.Equipment WHERE EquipmentCode = 'APU-01');

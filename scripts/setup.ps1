@@ -3,20 +3,10 @@
     Prepare the project: verify prerequisites, create the environment, build the database.
 
 .DESCRIPTION
-    The script a reviewer runs first. It checks every prerequisite before changing
-    anything, so a missing dependency is reported up front rather than halfway through
-    an install.
+    Checks every prerequisite before changing anything, then creates the virtual
+    environment, the .env file, the database and the dashboard's packages.
 
-    Steps:
-      1. verify Python, Node and SQL Server
-      2. create the virtual environment and install requirements
-      3. create .env from .env.example if it does not exist
-      4. create the database and apply schema, seed and views
-      5. install the dashboard's npm packages
-      6. report what remains to be done
-
-    Safe to re-run. Nothing here is destructive: an existing .env is never overwritten,
-    and the SQL scripts are all idempotent.
+    Safe to re-run: an existing .env is never overwritten and the SQL is idempotent.
 
 .PARAMETER SkipPython
     Do not create the virtual environment or install Python packages.

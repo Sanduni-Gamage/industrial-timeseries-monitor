@@ -1,36 +1,37 @@
 # Industrial Equipment Time-Series Monitoring Platform
 
 An end-to-end condition-monitoring system for a metro train's compressor Air Production
-Unit: **22.7 million sensor readings** ingested, validated, stored in SQL Server, analysed,
+Unit. 22.7 million sensor readings ingested, validated, stored in SQL Server, analysed,
 served through a REST API, and presented to an operations engineer through a web
-dashboard - with the routine work automated in PowerShell.
+dashboard, with the routine work automated in PowerShell.
 
 Built on the [UCI MetroPT-3 dataset](https://archive.ics.uci.edu/dataset/791/metropt+3+dataset)
 (DOI `10.24432/C5VW3R`).
 
-> **What this is.** A portfolio project applying industrial time-series monitoring
-> concepts to a published research dataset. It is **not** a commercial process historian,
-> and it is not connected to live plant equipment. See [Limitations](#limitations).
+> A portfolio project applying industrial time-series monitoring concepts to a published
+> research dataset.
 
 ---
 
 ## The problem
 
 A compressor either runs or it does not, and by the time it does not, a train is
-stationary. Condition monitoring is the practice of watching the machine's own signals -
-pressures, temperatures, motor current - closely enough to notice a change before it
+stationary. Condition monitoring is the practice of watching the machine's own signals,
+pressures, temperatures and motor current, closely enough to notice a change before it
 becomes a failure.
 
-That is easy to describe and awkward to do, for reasons this project ran into rather than
-read about:
+That is easy to describe and awkward to do, for three reasons this project ran into rather
+than read about.
 
-- **The archive is not the machine.** 3.35% of this dataset is a logging device repeating
-  its last reading. Those values are non-null and inside their plausible range, so a null
-  check and a range check both pass them. They are not measurements.
-- **"Normal" is not a number.** The compressor is switched off 55% of the time, so every
-  pressure signal is bimodal and a single average describes neither state.
-- **A detector that finds everything finds nothing.** A textbook outlier rule on this data
-  produces roughly 7,300 alarms a day, against published guidance of about 150.
+The archive is not the machine. 3.35% of this dataset is a logging device repeating its
+last reading. Those values are non-null and inside their plausible range, so a null check
+and a range check both pass them. They are not measurements.
+
+"Normal" is not a number. The compressor is switched off 55% of the time, so every
+pressure signal is bimodal and a single average describes neither state.
+
+A detector that finds everything finds nothing. A textbook outlier rule on this data
+produces roughly 7,300 alarms a day, against published guidance of about 150.
 
 The system is built around those three facts.
 
@@ -40,14 +41,14 @@ The system is built around those three facts.
 
 | | |
 |---|---|
-| **Stores history** | 22,754,220 readings, tag-based schema, ~1 GB with page compression |
-| **Validates on the way in** | Nothing is silently dropped: bad values are labelled, unusable rows are quarantined verbatim |
-| **Knows what it does not know** | Every reading carries a quality code; gaps and held data are reported, never filled in |
-| **Finds abnormal behaviour** | Adaptive detection against the machine's own recent behaviour, in the same operating state |
-| **Compresses like a historian** | Swinging-door trending: **4.3×** fewer readings with a *verified* error bound |
-| **Answers questions fast** | 14 REST endpoints, p95 under 50 ms |
-| **Shows an operator the answer** | Five-screen dashboard in plain language, no statistical jargon |
-| **Runs itself** | Five PowerShell scripts with a tested exit-code contract |
+| Stores history | 22,754,220 readings, tag-based schema, ~1 GB with page compression |
+| Validates on the way in | Nothing is silently dropped: bad values are labelled, unusable rows are quarantined verbatim |
+| Knows what it does not know | Every reading carries a quality code; gaps and held data are reported, never filled in |
+| Finds abnormal behaviour | Adaptive detection against the machine's own recent behaviour, in the same operating state |
+| Compresses like a historian | Swinging-door trending: 4.3× fewer readings with a verified error bound |
+| Answers questions fast | 14 REST endpoints, p95 under 50 ms |
+| Shows an operator the answer | Five-screen dashboard in plain language, no statistical jargon |
+| Runs itself | Five PowerShell scripts with a tested exit-code contract |
 
 ---
 
@@ -111,9 +112,9 @@ Full detail, including the six numbered design decisions: [`docs/ARCHITECTURE.md
 
 ## Technologies
 
-**Python 3.12** · **SQL Server 2025 Express** · **FastAPI** · **React 19 + TypeScript** ·
-**PowerShell 5.1** · pandas · NumPy · pyodbc · Pydantic v2 · Recharts · Vite ·
-pytest · ruff · mypy · Jinja2 · statsmodels · GitHub Actions · Docker *(optional)*
+Python 3.12 · SQL Server 2025 Express · FastAPI · React 19 + TypeScript · PowerShell 5.1 ·
+pandas · NumPy · pyodbc · Pydantic v2 · Recharts · Vite · pytest · ruff · mypy · Jinja2 ·
+statsmodels · GitHub Actions · Docker (optional)
 
 ---
 
@@ -121,31 +122,31 @@ pytest · ruff · mypy · Jinja2 · statsmodels · GitHub Actions · Docker *(op
 
 | | |
 |---|---|
-| Readings ingested | **22,754,220** in 18.3 min (20,727/s) |
-| Re-run (same file) | **3 s** - SHA-256 short-circuit |
-| Re-run (`--force`) | **0 rows inserted**, all matched as present |
-| Database size | **1,032 MB** - ~10% of the Express cap |
-| Alarm reduction | **7,286/day → 12.5/day** (583×), within EEMUA 191 guidance |
-| Anomaly enrichment before documented failures | **11.5×** |
-| Swinging-door compression @ 0.1% of span | **10,618,636 → 2,444,738** readings (**4.3×**) |
-| Compression error budget used | **0.9998-1.0000** - tight, and never exceeded |
-| Interpolated retrieval | 111,692 discarded readings checked, **0** outside the bound |
+| Readings ingested | 22,754,220 in 18.3 min (20,727/s) |
+| Re-run, same file | 3 s, SHA-256 short-circuit |
+| Re-run with `--force` | 0 rows inserted, all matched as present |
+| Database size | 1,032 MB, about 10% of the Express cap |
+| Alarm reduction | 7,286/day → 12.5/day (583×), within EEMUA 191 guidance |
+| Anomaly enrichment before documented failures | 11.5× |
+| Swinging-door compression at 0.1% of span | 10,618,636 → 2,444,738 readings (4.3×) |
+| Compression error budget used | 0.9998-1.0000, tight and never exceeded |
+| Interpolated retrieval | 111,692 discarded readings checked, 0 outside the bound |
 | API p95 | `/summary` 30 ms · `/health` 10 ms · readings 9-17 ms |
-| Tests | **242** (233 need no database) |
-| Exit-code contract | **13/13** |
+| Tests | 242 (233 need no database) |
+| Exit-code contract | 13/13 |
 
 ---
 
 ## Compressing like a historian
 
-The property that separates a process historian from a table with timestamps in it is that
-it **does not store every reading** - and still guarantees what it gives back.
+What separates a process historian from a table with timestamps in it is that it does not
+store every reading, and still guarantees what it gives back.
 
-[`analytics/compression.py`](analytics/compression.py) implements **Swinging Door
-Trending**: keep a reading only when no straight line from the last archived point can
-cover it within a stated deviation. `analytics.fn_ValueAt` then answers *"what was this tag
-reading at 14:07:33"* from the two archived points that bracket the request - whether or
-not anything was stored at that instant.
+[`analytics/compression.py`](analytics/compression.py) implements Swinging Door Trending:
+keep a reading only when no straight line from the last archived point can cover it within
+a stated deviation. `analytics.fn_ValueAt` then answers "what was this tag reading at
+14:07:33" from the two archived points that bracket the request, whether or not anything
+was stored at that instant.
 
 ```powershell
 .venv\Scripts\python.exe scripts\run_compression.py --sweep   # the trade-off curve
@@ -154,37 +155,37 @@ not anything was stored at that instant.
 | Deviation (% of span) | Readings kept | Ratio |
 |---|---|---|
 | 0.02% | 4,761,015 | 2.2× |
-| **0.10%** | **2,444,738** | **4.3×** |
+| 0.10% | 2,444,738 | 4.3× |
 | 1.00% | 833,713 | 12.7× |
 
-The spread between sensors is the interesting part - `DV_PRESSURE` compresses **24.6×**
-because it sits flat for most of its life; `OIL_TEMPERATURE` manages only **2.0×** because
-its noise is comparable to the deadband. Compression ratio is a property of the *signal*,
-which is the argument against a single global setting.
+The spread between sensors is the interesting part. `DV_PRESSURE` compresses 24.6× because
+it sits flat for most of its life, while `OIL_TEMPERATURE` manages only 2.0× because its
+noise is comparable to the deadband. Compression ratio is a property of the signal, which
+is the argument against a single global setting.
 
-**The bound is verified, not asserted.** Every run reconstructs the full series from the
-retained points and reports the worst deviation; the "error budget used" across all seven
-analogue sensors is **0.9998-1.0000** - the algorithm spends essentially its whole
-allowance and never exceeds it. Taking 111,692 readings compression *discarded* and asking
-`fn_ValueAt` for those exact instants gave a max error of **0.009518** against an
-allowance of **0.009572**, with **zero** violations.
+The bound is verified rather than asserted. Every run reconstructs the full series from
+the retained points and reports the worst deviation, and the error budget used across all
+seven analogue sensors is 0.9998-1.0000: the algorithm spends essentially its whole
+allowance and never exceeds it. Taking 111,692 readings compression discarded and asking
+`fn_ValueAt` for those exact instants gave a max error of 0.009518 against an allowance of
+0.009572, with zero violations.
 
-Two other historian behaviours came with it: a **time-weighted mean** alongside the simple
-one (they differ by up to **50%** on sparse buckets, where uneven sampling has the most
-leverage), and a refusal to interpolate across a gap - `fn_ValueAt` returns no row rather
-than a line drawn through a period when nothing was recorded.
+Two other historian behaviours came with it. A time-weighted mean alongside the simple one,
+which differ by up to 50% on sparse buckets where uneven sampling has the most leverage.
+And a refusal to interpolate across a gap: `fn_ValueAt` returns no row rather than a line
+drawn through a period when nothing was recorded.
 
-Finding the bound was *not* actually held in the textbook algorithm is
-[DEV_LOG DL-043](docs/DEV_LOG.md), and the full scorecard - including what a real historian
-has that this does not - is [`docs/HISTORIAN_CONCEPTS.md`](docs/HISTORIAN_CONCEPTS.md).
+The discovery that the textbook algorithm does not actually hold its own bound is
+[DEV_LOG DL-043](docs/DEV_LOG.md), and the full scorecard, including what a real historian
+has that this does not, is [`docs/HISTORIAN_CONCEPTS.md`](docs/HISTORIAN_CONCEPTS.md).
 
 ---
 
 ## Screenshots
 
-> **Placeholders - add images here.** Both servers must be running (see
-> [Running locally](#running-locally)), then capture at **1280 px wide** in **dark theme**
-> and save as PNG to `docs/screenshots/`.
+Placeholders, to be replaced with images. Both servers must be running (see
+[Running locally](#running-locally)), then capture at 1280 px wide in dark theme and save
+as PNG to `docs/screenshots/`.
 
 | File to add | Page | What it should show |
 |---|---|---|
@@ -211,8 +212,7 @@ has that this does not - is [`docs/HISTORIAN_CONCEPTS.md`](docs/HISTORIAN_CONCEP
 Python 3.12 · Node 20+ · SQL Server (any edition, including Express) · ODBC Driver 18 for
 SQL Server.
 
-Docker is **not** required - see [Docker](#docker) if you would rather run SQL Server that
-way.
+Docker is not required. See [Docker](#docker) if you would rather run SQL Server that way.
 
 ### Setup
 
@@ -226,8 +226,8 @@ cd industrial-timeseries-monitor
 
 ### Get the dataset
 
-Not committed - it is 208 MB. See [`data/README.md`](data/README.md) for the hashes to
-verify against.
+Not committed, because it is 208 MB. See [`data/README.md`](data/README.md) for the hashes
+to verify against.
 
 ```bash
 curl -L --retry 6 --retry-all-errors --retry-delay 5 \
@@ -236,7 +236,7 @@ curl -L --retry 6 --retry-all-errors --retry-delay 5 \
      "https://archive.ics.uci.edu/static/public/791/metropt+3+dataset.zip"
 ```
 
-The retry flags are not decoration: the endpoint sends no `Content-Length` and drops
+The retry flags are not decoration. The endpoint sends no `Content-Length` and drops
 connections mid-stream, and a truncated download still looks like a valid ZIP.
 
 ### Load and analyse
@@ -266,11 +266,11 @@ npm --prefix dashboard run dev           # http://localhost:5173
 ### Docker
 
 `docker-compose.yml` runs SQL Server in a container for anyone who does not have it
-installed. Point `DB_SERVER` at `localhost,1433` in `.env` and continue from *Setup*.
+installed. Point `DB_SERVER` at `localhost,1433` in `.env` and continue from Setup.
 
-**Honest note:** this project was developed against a natively installed SQL Server. The
-compose file is provided for convenience and has **not** been exercised on this machine -
-Docker is not installed here.
+One honest note: this project was developed against a natively installed SQL Server. The
+compose file is provided for convenience and has not been exercised on this machine,
+because Docker is not installed here.
 
 ---
 
@@ -292,10 +292,10 @@ npm --prefix dashboard run typecheck
 npm --prefix dashboard run build
 ```
 
-**233 of the 242 tests need no database.** The API depends on a repository seam, so a fake
-substitutes for SQL Server and the entire HTTP surface - status codes, error shapes,
-pagination, resolution selection - is verified without any infrastructure. That is what
-keeps CI on the free tier.
+233 of the 242 tests need no database. The API depends on a repository seam, so a fake
+substitutes for SQL Server and the entire HTTP surface, including status codes, error
+shapes, pagination and resolution selection, is verified without any infrastructure. That
+is what keeps CI on the free tier.
 
 The tests aim at the paths that do not run in normal operation. The source file is clean
 enough that the quarantine code never executed across two full loads, so it is proven
@@ -310,7 +310,7 @@ All eleven live in [`database/queries/`](database/queries/) and are executed by
 `scripts/run_queries.py`, so the timings in [`docs/SQL_DESIGN.md`](docs/SQL_DESIGN.md) are
 measured rather than claimed.
 
-**Latest value per sensor - the access path matters more than the result.**
+Latest value per sensor, where the access path matters more than the result.
 
 ```sql
 -- CROSS APPLY ... TOP 1: one backward index seek per sensor. 15 seeks, ~16 ms.
@@ -329,7 +329,7 @@ WHERE s.IsActive = 1
 ORDER BY s.DisplayOrder;
 ```
 
-**Hourly aggregation that admits how much data it used.**
+Hourly aggregation that admits how much data it used.
 
 ```sql
 -- A fully covered hour is 360 samples at the measured 10 s interval. This archive is
@@ -349,7 +349,7 @@ GROUP BY DATEADD(hour, DATEDIFF(hour, 0, r.ReadingTs), 0)
 ORDER BY BucketStart;
 ```
 
-**Gap detection - 331 gaps, the largest 48 hours.**
+Gap detection: 331 gaps, the largest 48 hours.
 
 ```sql
 WITH scans AS (
@@ -367,7 +367,7 @@ WHERE PrevReadingTs IS NOT NULL
 ORDER BY GapSeconds DESC;
 ```
 
-**Pre-failure analysis that refuses to answer when it cannot.**
+Pre-failure analysis that refuses to answer when it cannot.
 
 ```sql
 -- 69.5% of failure event #1's 24-hour lead-up is held data from a frozen logger.
@@ -386,41 +386,40 @@ FROM stats AS s;   -- full query: database/queries/10_failure_correlation.sql
 
 ## Design decisions
 
-**Why SQL Server.** Named in the target role, and it earns its place: window functions,
+Why SQL Server. Named in the target role, and it earns its place: window functions,
 `APPLY`, columnstore indexes, page compression and `MERGE` all do real work here. Express
-Edition's 10 GB cap shaped the storage design rather than obstructing it - the full
+Edition's 10 GB cap shaped the storage design rather than obstructing it, and the full
 archive uses about a tenth of it.
 
-**Why a narrow (tag/value) fact table.** `(SensorId, ReadingTs, Value, QualityCodeId)` -
+Why a narrow tag/value fact table. `(SensorId, ReadingTs, Value, QualityCodeId)` gives
 22.7 million rows instead of 1.5 million wide ones. This is how tag-based historians model
 data, and it is the whole point: adding a sensor is a row in `asset.Sensor`, not a schema
-migration. The cost is honestly stated in
-[`docs/SQL_DESIGN.md`](docs/SQL_DESIGN.md) AD-1.
+migration. The cost is stated honestly in [`docs/SQL_DESIGN.md`](docs/SQL_DESIGN.md) AD-1.
 
-**Why no surrogate `ReadingId`.** On 22.7 million rows an 8-byte identity costs ~180 MB
-and buys nothing: `(SensorId, ReadingTs)` is already unique, and it is the exact order
-every query wants. A deliberate deviation from the original brief, recorded as AD-2.
+Why no surrogate `ReadingId`. On 22.7 million rows an 8-byte identity costs ~180 MB and
+buys nothing: `(SensorId, ReadingTs)` is already unique, and it is the exact order every
+query wants. A deliberate deviation from the original brief, recorded as AD-2.
 
-**Why Python.** pandas makes chunked reading and vectorised validation of a 208 MB file
+Why Python. pandas makes chunked reading and vectorised validation of a 208 MB file
 straightforward, and `fast_executemany` is the difference between an 18-minute load and an
 overnight one.
 
-**Why FastAPI.** Automatic OpenAPI is not a convenience here - it is the contract the
+Why FastAPI. Automatic OpenAPI is not a convenience here. It is the contract the
 dashboard's TypeScript types are generated from, and CI fails if the two drift.
 
-**Why the endpoints are synchronous `def`.** `pyodbc` blocks. FastAPI runs a sync endpoint
-in a worker thread, so a slow query delays one request instead of stalling every other
-one. Declaring them `async` would look more modern and be strictly worse.
+Why the endpoints are synchronous `def`. pyodbc blocks. FastAPI runs a sync endpoint in a
+worker thread, so a slow query delays one request instead of stalling every other one.
+Declaring them `async` would look more modern and be strictly worse.
 
-**Why baselines are per operating state.** Because a global one is wrong, not merely
+Why baselines are per operating state. Because a global one is wrong, not merely
 imprecise. Measured over the reference month, the 1.5×IQR fences for `TP2` across all
-states land at -0.015…-0.007 bar while the sensor genuinely reaches 10.68 bar under load:
-the rule would flag every moment the machine runs. For `MOTOR_CURRENT` the same rule gives
-a *negative* lower fence and flags nothing. Both failure modes, opposite directions,
-same cause. [`docs/ANALYTICS_FINDINGS.md`](docs/ANALYTICS_FINDINGS.md) §1.
+states land at -0.015…-0.007 bar while the sensor genuinely reaches 10.68 bar under load,
+so the rule would flag every moment the machine runs. For `MOTOR_CURRENT` the same rule
+gives a negative lower fence and flags nothing. Both failure modes, opposite directions,
+same cause. [`docs/ANALYTICS_FINDINGS.md`](docs/ANALYTICS_FINDINGS.md) section 1.
 
-**Why thresholds live in the database.** No alert limit is written into code. A limit is a
-row in `analytics.SensorBaseline` computed from a named, documented window - so it can be
+Why thresholds live in the database. No alert limit is written into code. A limit is a row
+in `analytics.SensorBaseline` computed from a named, documented window, so it can be
 challenged, recomputed, or shown to somebody who disagrees with it.
 
 ---
@@ -430,25 +429,26 @@ challenged, recomputed, or shown to somebody who disagrees with it.
 Written up in full in [`docs/ANALYTICS_FINDINGS.md`](docs/ANALYTICS_FINDINGS.md),
 including the results that did not work out.
 
-**3.35% of the archive is frozen data.** All seven analogue signals holding bit-identical
-values simultaneously for up to 51 hours - motor current pinned at 5.575 A with the intake
-valve shut, oil temperature steady to four decimal places for two days. The dataset
-correctly declares `has_missing_values: no`; there is not one null. **Completeness is not
-correctness**, and only a change-detection check finds it.
+3.35% of the archive is frozen data. All seven analogue signals held bit-identical values
+simultaneously for up to 51 hours: motor current pinned at 5.575 A with the intake valve
+shut, oil temperature steady to four decimal places for two days. The dataset correctly
+declares `has_missing_values: no` and there is not one null. Completeness is not
+correctness, and only a change-detection check finds it.
 
-**Naive detection produces 7,286 alarms a day.** Two measured causes: normal behaviour
-drifts (oil temperature under load is 55 °C in February and 65-70 °C afterwards), and IQR
-fences collapse on tightly-peaked signals (`MOTOR_CURRENT` while off has a 0.01 A fence
-against 0.0088 A of scatter). Adaptive comparison, robust statistics, hourly evaluation and
-an ISA-18.2 on-delay bring that to **12.5 a day** - a 583× reduction - with **11.5×**
+Naive detection produces 7,286 alarms a day. Two measured causes: normal behaviour drifts,
+with oil temperature under load at 55 °C in February and 65-70 °C afterwards, and IQR
+fences collapse on tightly-peaked signals, with `MOTOR_CURRENT` while off having a 0.01 A
+fence against 0.0088 A of scatter. Adaptive comparison, robust statistics, hourly
+evaluation and an ISA-18.2 on-delay bring that to 12.5 a day, a 583× reduction, with 11.5×
 enrichment before the documented failures.
 
-**A finding I had to withdraw.** Against the February baseline the compressor appeared to
-run far more than normal before each failure - physically plausible for an air leak, and
-tempting to report. Checked against *every* rolling 24-hour window in the archive instead,
-event #2 sits at the 64th percentile and event #3 at the **38th**, below the median. Only
-one of three usable events is unusual. The pattern came from anchoring on February, which
-is itself an atypically quiet month. Reporting it as a predictor would have been wrong.
+A finding I had to withdraw. Against the February baseline the compressor appeared to run
+far more than normal before each failure, which is physically plausible for an air leak
+and tempting to report. Checked against every rolling 24-hour window in the archive
+instead, event #2 sits at the 64th percentile and event #3 at the 38th, below the median.
+Only one of three usable events is unusual. The pattern came from anchoring on February,
+which is itself an atypically quiet month. Reporting it as a predictor would have been
+wrong.
 
 ---
 
@@ -457,48 +457,48 @@ is itself an atypically quiet month. Reporting it as a predictor would have been
 Stated plainly, because a portfolio project that overstates itself is worse than one that
 does less.
 
-- **This is not a process historian.** No PI System, no IP.21, no Wonderware. It
-  implements historian *mechanisms* on a general-purpose RDBMS - tag modelling, OPC-style
+- This is not a process historian. No PI System, no IP.21, no Wonderware. It implements
+  historian mechanisms on a general-purpose RDBMS, including tag modelling, OPC-style
   quality codes, a raw archive alongside an aggregate archive, swinging-door compression,
-  interpolated retrieval and time-weighted aggregation - and measures each one. What it
-  does **not** have is an asset framework, store-and-forward collectors, native OPC
+  interpolated retrieval and time-weighted aggregation, and measures each one. What it
+  does not have is an asset framework, store-and-forward collectors, native OPC
   connectivity, retention tiering or high availability.
   [`docs/HISTORIAN_CONCEPTS.md`](docs/HISTORIAN_CONCEPTS.md) is the itemised scorecard,
   including everything in the "not" list.
-- **No live connection to anything.** The data is a fixed 2020 archive. There is no OPC UA
+- No live connection to anything. The data is a fixed 2020 archive. There is no OPC UA
   client, no MQTT subscriber, no streaming ingest. Time ranges anchor to the end of the
   archive rather than to the wall clock, because otherwise every default view is empty.
-- **One machine, one failure mode, four events - three of them usable.** Nothing here
+- One machine, one failure mode, four events, three of them usable. Nothing here
   generalises to other equipment or other faults, and no accuracy figure computed from
   three positives would mean anything. None is quoted.
-- **No operating context.** No train schedule, ambient temperature or demand data, so a
-  rise in duty cycle cannot be separated from a busier week.
-- **The reference baseline is atypical.** February is at roughly the 12th percentile of
+- No operating context. No train schedule, ambient temperature or demand data, so a rise
+  in duty cycle cannot be separated from a busier week.
+- The reference baseline is atypical. February is at roughly the 12th percentile of
   machine activity. It is kept because it is the only substantial failure-free window, and
   the limitation is recorded rather than papered over.
-- **Association, not causation.** The 11.5× enrichment says alarms and failures co-occur.
-  It does not establish that those alarms would have been actionable in advance.
-- **Single-node, single-user.** No authentication, no role-based access, no high
-  availability, no retention policy enforcement.
-- **CI has not run on GitHub.** The workflow's five jobs were each executed locally before
+- Association, not causation. The 11.5× enrichment says alarms and failures co-occur. It
+  does not establish that those alarms would have been actionable in advance.
+- Single-node, single-user. No authentication, no role-based access, no high availability,
+  no retention policy enforcement.
+- CI has not run on GitHub. The workflow's five jobs were each executed locally before
   being committed, but no remote exists yet, so no badge is claimed.
 
 ---
 
 ## Future improvements
 
-- Connect a live source over **OPC UA** or **MQTT**, with the existing validation applied
-  to the stream rather than to a file.
-- **Streaming ingest** with a windowed detector, instead of batch loads.
-- Integrate with a real **historian** and compare storage and retrieval behaviour against
-  this implementation.
-- **Role-based access control** and an audit trail on threshold changes.
-- Deploy to **Azure** - SQL Database, Container Apps for the API, Static Web Apps for the
+- Connect a live source over OPC UA or MQTT, with the existing validation applied to the
+  stream rather than to a file.
+- Streaming ingest with a windowed detector, instead of batch loads.
+- Integrate with a real historian and compare storage and retrieval behaviour against this
+  implementation.
+- Role-based access control and an audit trail on threshold changes.
+- Deploy to Azure: SQL Database, Container Apps for the API, Static Web Apps for the
   dashboard.
-- **Alarm rationalisation** to ISA-18.2: priority assignment, shelving, and a
+- Alarm rationalisation to ISA-18.2, with priority assignment, shelving, and a
   suppression-on-shutdown rule.
-- Extend detection to **multivariate** relationships beyond the single documented
-  cross-sensor invariant.
+- Extend detection to multivariate relationships beyond the single documented cross-sensor
+  invariant.
 
 ---
 
@@ -508,18 +508,18 @@ does less.
 |---|---|
 | [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) | Layers, data flow, decisions AD-1…AD-6 |
 | [`docs/DATA_DICTIONARY.md`](docs/DATA_DICTIONARY.md) | Every column, verbatim source descriptions, the failure table and its defects |
-| [`docs/DATA_PROFILE.md`](docs/DATA_PROFILE.md) | Measured profile - sampling, gaps, ranges, frozen blocks |
+| [`docs/DATA_PROFILE.md`](docs/DATA_PROFILE.md) | Measured profile: sampling, gaps, ranges, frozen blocks |
 | [`docs/SQL_DESIGN.md`](docs/SQL_DESIGN.md) | Schema, indexes, views, the eleven queries, and the measurement behind every threshold |
 | [`docs/ANALYTICS_FINDINGS.md`](docs/ANALYTICS_FINDINGS.md) | What the analysis found, including what failed |
-| [`docs/HISTORIAN_CONCEPTS.md`](docs/HISTORIAN_CONCEPTS.md) | Which historian properties are implemented, measured, and which are **not** |
+| [`docs/HISTORIAN_CONCEPTS.md`](docs/HISTORIAN_CONCEPTS.md) | Which historian properties are implemented and measured, and which are not |
 | [`docs/OPERATIONS.md`](docs/OPERATIONS.md) | Runbook: exit codes, troubleshooting, scheduling, recovery |
-| [`docs/DEV_LOG.md`](docs/DEV_LOG.md) | **46 entries** - every real error hit while building this, with root cause and fix |
+| [`docs/DEV_LOG.md`](docs/DEV_LOG.md) | 46 entries, every real error hit while building this, with root cause and fix |
 | [`docs/IMPLEMENTATION_PLAN.md`](docs/IMPLEMENTATION_PLAN.md) | The nine phases and their measured exit criteria |
 
-`docs/DEV_LOG.md` is the one worth reading. It records what actually broke - a memory-grant
+`docs/DEV_LOG.md` is the one worth reading. It records what actually broke: a memory-grant
 stall that looked like a hang, a case-insensitive filesystem deleting a stylesheet, a view
-that could never return a row, a lint fix that introduced a render loop - because the
-recovery is usually the interesting part.
+that could never return a row, a lint fix that introduced a render loop. The recovery is
+usually the interesting part.
 
 ---
 
@@ -544,5 +544,5 @@ recovery is usually the interesting part.
 }
 ```
 
-The dataset is redistributed by UCI under its own terms and is **not** included in this
+The dataset is redistributed by UCI under its own terms and is not included in this
 repository.

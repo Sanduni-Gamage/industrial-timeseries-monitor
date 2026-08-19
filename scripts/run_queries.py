@@ -1,8 +1,6 @@
 """Execute every demonstration query and record its result count and timing.
 
-A .sql file that has never been run is a liability, not documentation. This runs all of
-them against the live database, so the numbers quoted in docs/SQL_DESIGN.md are measured
-rather than claimed, and a schema change that breaks a query is caught immediately.
+A .sql file that has never been run is a liability, not documentation.
 
 Usage
 -----

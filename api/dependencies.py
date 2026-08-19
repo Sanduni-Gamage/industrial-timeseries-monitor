@@ -49,14 +49,11 @@ def resolve_window(
     fallback_end: datetime | None = None,
     default_days: int = DEFAULT_WINDOW_DAYS,
 ) -> tuple[datetime, datetime]:
-    """Turn optional bounds into a validated half-open ``[start, end)`` window.
+    """Turn optional bounds into a validated half-open [start, end) window.
 
-    Half-open on purpose: adjacent windows tile without double-counting the boundary
-    sample, which a closed interval would return in both.
-
-    Defaults anchor to the end of the **archive**, not to now. Against the wall clock
-    every reading in a 2020 dataset is months stale, so a "last 7 days" default would
-    return nothing at all and look like a broken API.
+    Half-open so adjacent windows tile without double-counting the boundary sample.
+    Defaults anchor to the end of the archive rather than to now: against the wall clock a
+    "last 7 days" default over 2020 data returns nothing and looks like a broken API.
     """
     anchor = fallback_end or datetime.now()
 

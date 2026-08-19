@@ -1,23 +1,8 @@
-"""Baseline statistics - the single source of every threshold in the system.
+"""Descriptive statistics and stored baselines.
 
-The rule this module exists to enforce: **no alert limit is ever written into code.**
-A limit is a row in ``analytics.SensorBaseline``, computed from a named window, over a
-named operating state, excluding held data, and recorded with the method that produced
-it. Anyone can re-run it and get the same numbers, or challenge the window and see what
-changes.
-
-Three deliberate exclusions, each of which would otherwise poison the statistics:
-
-1. **Held (frozen) scans.** 3.35% of the archive is a logger repeating its last reading.
-   Those values are plausible and would pass every range check, but they are not
-   measurements. Including them shrinks the apparent variance of whichever value happened
-   to be frozen - making the control limits *tighter* and the machine look *more* stable
-   than it is.
-2. **Bad-quality readings.** Anything the validator marked unusable.
-3. **The wrong operating state.** See ``operating_state.py`` for why this is not optional.
-
-The reference window is February 2020: the first full month, before all four documented
-failures, and free of any frozen block longer than two scans.
+Every threshold the detectors use is written to analytics.SensorBaseline with its window,
+operating state, sample count and method, so a limit can be challenged and recomputed
+rather than being a literal in code.
 """
 
 from __future__ import annotations
@@ -103,14 +88,11 @@ def compute(
     window_end: str = REFERENCE_END,
     states: tuple[str, ...] = BASELINE_STATES,
 ) -> list[BaselineRow]:
-    """Compute per-sensor, per-operating-state statistics over the reference window.
+    """Compute per-sensor, per-state statistics over the reference window.
 
-    Percentiles use ``APPROX_PERCENTILE_CONT`` (SQL Server 2022+). The exact
-    ``PERCENTILE_CONT`` is a window function that sorts every row in each partition,
-    which on Express spills to tempdb at this volume. The approximation's error bound is
-    far below the precision of a 4-byte sensor value, and these numbers are control
-    limits rather than published measurements - so exactness buys nothing here and costs
-    a great deal.
+    Percentiles use APPROX_PERCENTILE_CONT. The exact form sorts every row per partition
+    and spills to tempdb at this volume, and its extra precision is far below that of a
+    4-byte sensor value.
     """
     state_list = ", ".join(f"'{state}'" for state in states)
     sql = f"""

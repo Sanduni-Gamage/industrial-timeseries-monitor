@@ -1,18 +1,8 @@
 """Data access for the API.
 
-Every query the API issues lives here. Two reasons that matters:
-
-**Testability.** The routes depend on this class, not on a connection, so the whole HTTP
-surface can be tested against a fake repository with no SQL Server running. That is what
-keeps CI free of database infrastructure.
-
-**A single place to enforce cost.** Result caps, resolution selection and time-window
-requirements are applied here rather than scattered through routers, so no future
-endpoint can accidentally ask for 22.7 million rows.
-
-Endpoints are declared as plain ``def`` rather than ``async def``, so FastAPI runs them in
-a worker thread. ``pyodbc`` is blocking; calling it from an async endpoint would stall the
-event loop for every other request.
+One class per concern, all behind a protocol so tests can substitute a fake and cover the
+entire HTTP surface with no database running. Resolution (raw, hourly, daily) is chosen
+from the requested span so a six-month query never scans 22.7 million rows.
 """
 
 from __future__ import annotations

@@ -273,18 +273,11 @@ def test_report_names_the_benchmark_when_nothing_beats_it():
 # proves only that the code is self-consistent.
 
 def test_modified_z_score_matches_a_hand_computed_value():
-    """Series [1, 2, 3, 4, 100].
+    """Series [1, 2, 3, 4, 100]: median 3, MAD 1, modified z of 100 = 65.4265.
 
-        median            = 3
-        absolute devs     = [2, 1, 0, 1, 97]
-        MAD               = median of those = 1
-        modified z of 100 = 0.6745 x (100 - 3) / 1 = 65.4265
-
-    The point of the fixture is the contrast with a conventional z-score: the standard
-    deviation of this series is about 43.2, so a plain z-score of the outlier is only
-    ~2.2 - below a 3-sigma threshold. The single extreme value inflates the very statistic
-    meant to detect it. The median and MAD barely move, which is why the detector uses
-    them.
+    The contrast is the point. This series has a standard deviation of about 43.2, so a
+    plain z-score of the outlier is only ~2.2, below a 3-sigma threshold. The extreme
+    value inflates the statistic meant to catch it; the median and MAD barely move.
     """
     from analytics.anomaly_detection import MAD_SCALE
 

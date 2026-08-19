@@ -1,9 +1,7 @@
 """Measure API latency against the live database.
 
-The Phase 4 exit criterion asks for p95 latency, so it is measured rather than asserted.
-Runs in-process through Starlette's TestClient: that removes network and server overhead
-from the numbers, which is what you want when the question is "how expensive are my
-queries", not "how fast is my LAN".
+Runs in-process through Starlette's TestClient, so the numbers describe query cost rather
+than network overhead.
 
 Usage
 -----

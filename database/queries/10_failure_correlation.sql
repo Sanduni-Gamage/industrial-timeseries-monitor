@@ -1,27 +1,15 @@
 /* =====================================================================================
    Q10 - Failure correlation: sensor behaviour before each documented event.
 
-   Purpose      Compare the 24 / 12 / 6 / 1 hour run-up to each documented air-leak
-                event against a failure-free reference window, to see whether any signal
-                moves before the failure is reported.
+   Compares the 24 / 12 / 6 / 1 hour run-up to each air-leak event against a
+   failure-free reference window (February 2020).
 
-   The honest part, and the reason this query is shaped the way it is:
+   69.5% of event #1's 24-hour lead-up is held data from a frozen logger, so this query
+   counts usable against held scans, computes statistics over usable readings only, and
+   labels any window under 50% usable as INSUFFICIENT rather than returning a
+   comparable-looking average.
 
-   Profiling found that 69.5% of the 24-hour lead-up to event #1 is HELD data from a
-   frozen logger. Averaging it would produce a confident number describing an
-   instrumentation fault rather than a compressor fault. So this query:
-
-     - counts usable vs held scans in every window, and reports both;
-     - computes statistics over usable readings only (q.IsUsable = 1 AND not held);
-     - labels any window with under 50% usable data as INSUFFICIENT rather than
-       returning an average that looks comparable to the others.
-
-   With four documented events, only three of which have usable lead-up data, this is a
-   descriptive comparison. It is not, and is not presented as, a validated predictive
-   model - n=3 cannot support that claim.
-
-   Reference window: February 2020, which precedes all four events and contains no
-   frozen block longer than two scans.
+   Three usable events. A descriptive comparison, not a validated model.
    ===================================================================================== */
 
 DECLARE @SensorCode VARCHAR(32) = 'TP2';

@@ -1,25 +1,11 @@
 """Derive the compressor's operating state for every scan.
 
-This is the foundation the rest of the analytics stands on, and the reason it exists is
-worth stating plainly.
+The machine is off 54.65% of the time, so every pressure signal is bimodal and whole-file
+outlier statistics are wrong rather than merely imprecise: the 1.5x IQR fences for TP2
+come out at -0.020..-0.004 bar against a real range reaching 10.68 bar.
 
-Profiling showed the compressor is off for 54.65% of the archive and under load for
-15.20%. Every pressure signal is therefore **bimodal**, and ordinary outlier statistics
-computed over the whole file are not merely imprecise - they are wrong in a way that
-looks authoritative. The 1.5x IQR fences for TP2 over all data come out at
-``-0.020 .. -0.004`` bar against a real observed range of ``-0.032 .. 10.68`` bar: a rule
-that would flag every moment the machine actually runs, and miss real faults completely.
-The lower fence for Motor_current comes out at -5.6 A, a negative current.
-
-Comparing a reading against readings taken *in the same operating state* fixes this. It
-is the difference between "the average car speed is 20 km/h" and "the average speed while
-moving is 60 km/h, and it is parked 65% of the time".
-
-Band edges come from the dataset's own documentation, which states the nominal current
-for each state outright: "values close to 0A - when it turns off, 4A - when working
-offloaded, 7A - when working under load, and 9A - when it starts working". The
-boundaries below are the midpoints between those documented values, so they are traceable
-to the source rather than tuned.
+Band edges are the midpoints between the four nominal currents the dataset documents
+(0 / 4 / 7 / 9 A), so they trace to the source rather than being tuned.
 """
 
 from __future__ import annotations
@@ -109,15 +95,11 @@ def _sensor_id(conn: pyodbc.Connection, sensor_code: str) -> int:
 
 
 def rebuild(conn: pyodbc.Connection) -> ScanStateSummary:
-    """Recompute ``analytics.ScanState`` from the archive.
+    """Recompute analytics.ScanState from the archive.
 
-    Full rebuild rather than incremental: it is a single set-based pass, and a rebuild
-    cannot drift out of step with the readings the way an incremental update can after a
-    backfill. Safe to run at any time.
-
-    ``IsStale`` carries the held-data flag forward from ingestion, so every downstream
-    consumer can exclude a frozen scan with one predicate instead of re-deriving what the
-    validator already worked out.
+    A full set-based rebuild, because an incremental update can drift out of step after a
+    backfill. ``IsStale`` carries the held-data flag forward so downstream consumers can
+    exclude a frozen scan with one predicate.
     """
     motor_id = _sensor_id(conn, "MOTOR_CURRENT")
     comp_id = _sensor_id(conn, "COMP")

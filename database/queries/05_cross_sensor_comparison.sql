@@ -1,18 +1,11 @@
 /* =====================================================================================
    Q5 - Cross-sensor comparison against a documented physical invariant.
 
-   Purpose      The UCI documentation states that Reservoirs "should be close to" TP3.
-                That makes divergence between them a legitimate instrument-health check
-                rather than a threshold somebody invented.
+   The UCI documentation states Reservoirs "should be close to" TP3, so divergence is a
+   documented check rather than an invented threshold. Both sides of the self-join seek
+   the clustered key, so it merges two ordered streams instead of hashing 22.7M rows.
 
-   Technique    Self-join of the fact table to itself on ReadingTs, one side per sensor.
-                Both sides seek the clustered key, and because the key is
-                (SensorId, ReadingTs) each side is a contiguous range - the join is a
-                merge of two already-ordered streams, not a hash of 22.7M rows.
-
-   Measured     Mean divergence 0.0019 bar, P99 0.006 bar, maximum ever observed
-                0.182 bar, zero rows above 0.5 bar. The alert threshold is therefore
-                ~3x the worst real divergence: it flags a failed instrument, not noise.
+   Measured: mean 0.0019 bar, P99 0.006, max 0.182, zero rows above 0.5.
    ===================================================================================== */
 
 DECLARE @From DATETIME2(3) = '2020-06-05T00:00:00';

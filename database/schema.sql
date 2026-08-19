@@ -1,18 +1,14 @@
 /* =====================================================================================
    Industrial Time-Series Monitoring Platform - core schema
    Target: Microsoft SQL Server 2016 SP1 or later (developed on 2025 Express 17.0)
-
-   Idempotent: safe to run repeatedly. Every object is guarded, so re-running against an
-   existing database is a no-op rather than an error.
-
-   Run order:  schema.sql  ->  seed.sql  ->  [ingest]  ->  indexes.sql  ->  views.sql
-
-   Secondary indexes are deliberately NOT created here. Building a columnstore index
-   before loading 22.7 million rows makes the load dramatically slower; indexes.sql is
-   run after ingestion. See docs/SQL_DESIGN.md.
-
-   Design rationale for every choice below: docs/SQL_DESIGN.md
-   Measurements behind every threshold:     docs/DATA_PROFILE.md
+   
+   Idempotent: every object is guarded, so re-running is a no-op.
+   Run order: schema.sql -> seed.sql -> [ingest] -> indexes.sql -> views.sql
+   
+   Secondary indexes live in indexes.sql, because building a columnstore before loading
+   22.7 million rows makes the load dramatically slower.
+   
+   Rationale: docs/SQL_DESIGN.md. Measurements: docs/DATA_PROFILE.md.
    ===================================================================================== */
 
 SET NOCOUNT ON;
@@ -20,10 +16,9 @@ GO
 
 /* -------------------------------------------------------------------------------------
    1. Schemas (namespaces)
-
-   Layer separation is expressed with schemas rather than table-name prefixes so that
-   permissions can be granted per layer, and so the layering is visible in any client.
-   CREATE SCHEMA must be the first statement in its batch, hence the EXEC wrapper.
+   
+   Layer separation by schema rather than name prefix, so permissions can be granted per
+   layer. CREATE SCHEMA must start its own batch, hence the EXEC wrapper.
    ------------------------------------------------------------------------------------- */
 
 IF SCHEMA_ID('ref')       IS NULL EXEC('CREATE SCHEMA ref');
@@ -36,11 +31,9 @@ GO
 
 /* -------------------------------------------------------------------------------------
    2. ref.QualityCode
-
-   Every stored reading carries a quality code, so a value that failed validation is
-   retained and marked rather than deleted. Numeric ids follow the OPC DA convention
-   (Good = 192, Uncertain = 64, Bad = 0) so the scheme is recognisable to anyone with an
-   operational-technology background.
+   
+   Every reading carries a quality code, so a value that failed validation is marked
+   rather than deleted. Ids follow OPC DA: Good 192, Uncertain 64, Bad 0.
    ------------------------------------------------------------------------------------- */
 
 IF OBJECT_ID('ref.QualityCode', 'U') IS NULL
@@ -60,11 +53,10 @@ GO
 
 /* -------------------------------------------------------------------------------------
    3. asset.Equipment
-
-   The dataset covers a single Air Production Unit, so this table holds one row. It
-   exists regardless because the model must generalise to a second machine without a
-   schema change, and because the equipment-selection UX and /equipment endpoints have
-   to be backed by something real.
+   
+   One row, because the dataset covers one Air Production Unit. It exists so a second
+   machine needs no schema change, and so the /equipment endpoints have something real
+   behind them.
    ------------------------------------------------------------------------------------- */
 
 IF OBJECT_ID('asset.Equipment', 'U') IS NULL
@@ -85,15 +77,13 @@ GO
 
 /* -------------------------------------------------------------------------------------
    4. asset.Sensor
-
-   SourceColumn is what makes ingestion data-driven: the loader reads this table to
-   learn which CSV column maps to which SensorId, so adding a sensor is a seed row
-   rather than a code change.
-
-   PhysicalMin / PhysicalMax are plausibility limits, not alarm limits. They are set
-   generously outside the observed range so they catch corruption, not normal operation.
-   Note in particular that pressure floors are NEGATIVE: these are gauge pressures with
-   a small zero offset, and 84% of TP2 readings are below zero (DATA_PROFILE.md §5).
+   
+   SourceColumn makes ingestion data-driven: the loader reads this table to map CSV
+   columns to sensors, so adding a sensor is a seed row rather than a code change.
+   
+   PhysicalMin/Max are plausibility limits, not alarm limits, set generously outside the
+   observed range. The pressure floors are negative because these are gauge pressures
+   with a zero offset, and 84% of TP2 readings fall below zero.
    ------------------------------------------------------------------------------------- */
 
 IF OBJECT_ID('asset.Sensor', 'U') IS NULL
@@ -126,10 +116,9 @@ GO
 
 /* -------------------------------------------------------------------------------------
    5. ops.IngestionRun - the run ledger
-
-   Answers "when did data last land, and was it clean?", which is what health-check.ps1
-   and the dashboard's Data Quality panel both need. Recording the source hash is what
-   makes re-running a file detectable rather than merely harmless.
+   
+   Answers "when did data last land, and was it clean?". Recording the source hash makes
+   a re-run detectable rather than merely harmless.
    ------------------------------------------------------------------------------------- */
 
 IF OBJECT_ID('ops.IngestionRun', 'U') IS NULL
@@ -159,19 +148,17 @@ GO
 
 /* -------------------------------------------------------------------------------------
    6. ts.SensorReading - the fact table (~22.7 million rows)
-
-   Clustered on (SensorId, ReadingTs): tag-major, then time-ordered. That is the exact
-   physical order a "sensor X between t0 and t1" query wants, so those become a single
-   range seek with no sort. The same pair is the natural key that makes re-ingestion
-   idempotent, which is why there is no surrogate ReadingId - an 8-byte identity on
-   22.7M rows costs ~180 MB and buys nothing (docs/SQL_DESIGN.md, AD-2).
-
-   Value is REAL (4-byte float). Sensor telemetry is float32 at the source and in every
-   historian; REAL carries ~7 significant digits against the ~4 decimals actually
-   present, at half the storage of FLOAT.
-
-   Value is NOT NULL by design. A missing measurement is a row with a Bad quality code
-   or an absent row recorded in the gap report - never a NULL silently skewing AVG().
+   
+   Clustered on (SensorId, ReadingTs), the exact order a "sensor X between t0 and t1"
+   query wants, so those become a single range seek with no sort. That pair is also the
+   natural key making re-ingestion idempotent, which is why there is no surrogate id
+   (docs/SQL_DESIGN.md, AD-2).
+   
+   Value is REAL: telemetry is float32 at the source, and REAL carries ~7 significant
+   digits against the ~4 decimals present, at half the storage of FLOAT.
+   
+   NOT NULL by design. A missing measurement is a Bad-quality row or an absent row in the
+   gap report, never a NULL silently skewing AVG().
    ------------------------------------------------------------------------------------- */
 
 IF OBJECT_ID('ts.SensorReading', 'U') IS NULL
@@ -193,21 +180,14 @@ GO
 
 /* -------------------------------------------------------------------------------------
    7. stg.SensorReadingStage - bulk-load target
-
-   No constraints and no foreign keys: those would be evaluated once per row during the
-   bulk insert, whereas the set-based INSERT out of this table validates everything in a
-   single pass.
-
-   It does carry a clustered index, on the same key as the fact table. That is not for
-   the load itself but for the anti-join that follows it. Against a heap, SQL Server
-   chose a hash-based plan for the "WHERE NOT EXISTS" duplicate check and asked for a
-   ~62 MB memory grant per chunk; once the fact table passed ~16 million rows that grant
-   started queueing on RESOURCE_SEMAPHORE and one chunk stalled for over three minutes.
-   With both sides clustered on (SensorId, ReadingTs) the optimiser can seek or merge
-   instead, which needs almost no workspace memory. See docs/DEV_LOG.md DL-012.
-
-   The pipeline emits rows in tag-major, time-ascending order, so filling this index is
-   an append at 15 insertion points rather than a random scatter.
+   
+   No constraints or foreign keys, which would be evaluated per row during the bulk
+   insert; the set-based INSERT out of this table validates in one pass.
+   
+   It does carry a clustered index on the fact table's key, for the anti-join that
+   follows. Against a heap the optimiser chose a hash plan needing a ~62 MB grant per
+   chunk, which queued on RESOURCE_SEMAPHORE past 16 million rows and stalled one chunk
+   for three minutes. See docs/DEV_LOG.md DL-012.
    ------------------------------------------------------------------------------------- */
 
 IF OBJECT_ID('stg.SensorReadingStage', 'U') IS NULL
@@ -279,17 +259,11 @@ END
 GO
 
 /* Backfill rows written before the flag existed. They default to 0, which would make
-   every historical summary row look like a per-event detail and report its run total as
-   zero.
-
-   Guarded on the mis-flagged rows themselves rather than on the ALTER above, so it is
-   idempotent and self-healing: once corrected, nothing matches and this is a no-op. It
-   has to be a separate batch because the column does not exist at compile time in the
-   batch that adds it.
-
-   Matching on generated text is not elegant. It is exact for these rows, and it is a
-   single historical migration rather than ongoing logic - new rows carry the flag from
-   ingestion. */
+   every historical summary row look like a detail row and report its run total as zero.
+   
+   Guarded on the mis-flagged rows themselves, so it is idempotent and self-healing. It
+   must be its own batch, because the column does not exist at compile time in the batch
+   that adds it. */
 IF OBJECT_ID('ops.DataQualityIssue', 'U') IS NOT NULL
    AND EXISTS (SELECT 1 FROM ops.DataQualityIssue
                WHERE IsSummary = 0
@@ -325,11 +299,10 @@ GO
 
 /* -------------------------------------------------------------------------------------
    9. ops.FailureEvent
-
-   Seeded from the four maintenance reports published with the dataset. The source table
-   has defects - a duplicated "#1" identifier and a note dated April against a May
-   window - which are preserved verbatim in SourceReference / ReportNote and flagged in
-   DataQualityNote rather than silently corrected.
+   
+   Seeded from the four published maintenance reports. The source table's defects, a
+   duplicated identifier and a note dated April against a May window, are preserved
+   verbatim and flagged in DataQualityNote rather than corrected.
    ------------------------------------------------------------------------------------- */
 
 IF OBJECT_ID('ops.FailureEvent', 'U') IS NULL
@@ -353,15 +326,13 @@ GO
 
 /* -------------------------------------------------------------------------------------
    10. analytics.SensorBaseline
-
-   The rule this table enforces: no alert limit is ever typed into code. A limit is a
-   row here, computed from a named, documented, reproducible window.
-
-   OperatingState exists because profiling showed a single global baseline per sensor is
-   actively wrong on this machine. The compressor is off 54.65% of the time, so every
-   pressure signal is bimodal and its quartiles collapse into whichever mode is more
-   common - the global IQR fence for TP2 came out at -0.020..-0.004 bar against a real
-   range of -0.032..10.68 bar. See docs/SQL_DESIGN.md §6.6.
+   
+   No alert limit is ever typed into code. A limit is a row here, computed from a named,
+   reproducible window.
+   
+   OperatingState exists because a single global baseline is actively wrong on this
+   machine: the compressor is off 54.65% of the time, so the global IQR fence for TP2
+   came out at -0.020..-0.004 bar against a real range of -0.032..10.68 bar.
    ------------------------------------------------------------------------------------- */
 
 IF OBJECT_ID('analytics.SensorBaseline', 'U') IS NULL
@@ -396,18 +367,13 @@ GO
 
 /* -------------------------------------------------------------------------------------
    10b. analytics.ScanState - the derived operating state of the machine
-
-   One row per scan (not per reading), because operating state is a property of the
-   MACHINE at an instant, not of any individual tag.
-
-   Materialised rather than derived on the fly. Every baseline, every anomaly threshold
-   and the duty-cycle analysis all need "what was the compressor doing at this moment?",
-   and deriving it each time means self-joining a 22.7-million-row table against itself
-   on every query. 1.5 million rows here removes that join everywhere downstream.
-
-   The band edges are the midpoints between the four nominal currents the dataset
-   documentation states outright - 0 A off, 4 A offloaded, 7 A under load, 9 A starting.
-   They are not clustered, tuned, or chosen to make a result look good.
+   
+   One row per scan, not per reading: operating state is a property of the machine at an
+   instant, not of any tag. Materialised because deriving it per query would self-join a
+   22.7-million-row table; 1.5 million rows here removes that join downstream.
+   
+   Band edges are midpoints between the four nominal currents the documentation states
+   outright (0 / 4 / 7 / 9 A), not clustered or tuned.
    ------------------------------------------------------------------------------------- */
 
 IF OBJECT_ID('analytics.ScanState', 'U') IS NULL
@@ -441,10 +407,9 @@ GO
 
 /* -------------------------------------------------------------------------------------
    11. analytics.Anomaly
-
+   
    Method is part of the unique key on purpose: one instant may legitimately be flagged
-   by both the z-score and the IQR rule, and the dashboard should be able to say which
-   rule fired rather than collapsing them.
+   by both the z-score and the IQR rule, and the dashboard should say which fired.
    ------------------------------------------------------------------------------------- */
 
 IF OBJECT_ID('analytics.Anomaly', 'U') IS NULL
@@ -499,15 +464,12 @@ GO
 
 /* -------------------------------------------------------------------------------------
    12. analytics.SensorHourlyAgg / SensorDailyAgg - the aggregate archive
-
-   Materialised rollups rather than indexed views: SQL Server indexed views cannot
-   contain the window functions or the STDEV aggregate needed here, and scanning 22.7M
-   rows on every dashboard load is not acceptable. This mirrors the raw-archive plus
-   aggregate-archive split that process historians use.
-
-   GoodCount alongside SampleCount lets the UI show coverage. An hourly average built
-   from 12 samples is not the same number as one built from 360, and the dashboard
-   should say so rather than drawing both as a confident line.
+   
+   Materialised rather than indexed views, which cannot contain the window functions or
+   STDEV needed here. Mirrors the raw-plus-aggregate archive split historians use.
+   
+   GoodCount alongside SampleCount lets the UI show coverage: an average from 12 samples
+   is not the same number as one from 360.
    ------------------------------------------------------------------------------------- */
 
 IF OBJECT_ID('analytics.SensorHourlyAgg', 'U') IS NULL
@@ -531,14 +493,10 @@ END
 GO
 
 /* analytics.SensorHourlyStateAgg - hourly rollup split by operating state.
-
-   SensorHourlyAgg averages a whole hour regardless of what the machine was doing, which
-   on a compressor that duty-cycles every few minutes blends OFF and LOADED behaviour
-   into a number that describes neither. This table keeps them apart, which is what makes
-   a *trend* comparable to a *baseline*.
-
-   It is also what adaptive detection needs: comparing this hour's LOADED behaviour to
-   the last seven days of LOADED behaviour requires both sides to be state-aware. */
+   
+   SensorHourlyAgg blends OFF and LOADED behaviour into a number describing neither.
+   Keeping them apart is what makes a trend comparable to a baseline, and what adaptive
+   detection needs: both sides of the comparison must be state-aware. */
 IF OBJECT_ID('analytics.SensorHourlyStateAgg', 'U') IS NULL
 BEGIN
     CREATE TABLE analytics.SensorHourlyStateAgg (
@@ -581,16 +539,12 @@ GO
 
 /* -------------------------------------------------------------------------------------
    12b. Historian concepts: compressed archive and its measured cost
-
-   ts.SensorReadingCompressed holds the swinging-door output - the readings a straight
-   line cannot reconstruct within a stated tolerance. This is the thing that separates a
-   historian from a table with timestamps in it: a real one stores only this, and answers
-   every query by interpolating between the points it kept.
-
-   Here BOTH are kept, on purpose. This project's stated position is that nothing is
-   discarded without being able to show what was discarded, and holding the raw archive
-   alongside the compressed one makes the error bound checkable at any time rather than
-   trusted. A plant would keep only the compressed archive and accept the trade.
+   
+   ts.SensorReadingCompressed holds the swinging-door output, the readings a straight line
+   cannot reconstruct within a stated tolerance.
+   
+   Both archives are kept on purpose. A plant would keep only the compressed one; holding
+   the raw archive alongside makes the error bound checkable rather than trusted.
    ------------------------------------------------------------------------------------- */
 
 IF OBJECT_ID('ts.SensorReadingCompressed', 'U') IS NULL

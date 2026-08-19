@@ -3,11 +3,9 @@
     Produce the operational reports: data quality, equipment summary, anomaly summary.
 
 .DESCRIPTION
-    Regenerates the HTML data-quality report and writes a plain-text operations summary
-    that can be emailed, pasted into a ticket, or read in a terminal.
+    Regenerates the HTML data-quality report and a plain-text operations summary.
 
-    Every figure is queried at the moment of generation. Nothing is cached, hard-coded or
-    carried over from a previous run, so a stale number is impossible.
+    Every figure is queried at generation time, so a stale number is impossible.
 
 .PARAMETER OutputDirectory
     Where to write. Defaults to reports\ in the project root.

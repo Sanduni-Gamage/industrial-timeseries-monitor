@@ -1,17 +1,12 @@
 /**
  * Sensor explorer - pick a sensor and a period, see what it did.
  *
- * Two choices worth explaining:
+ * The server chooses the resolution and the UI states it. Seven months at 10-second
+ * resolution is 1.8 million points, so the API returns daily buckets and says so.
  *
- * **The resolution is chosen by the server and stated in the UI.** Asking for seven
- * months at 10-second resolution is 1.8 million points; the API returns daily buckets
- * instead and says so. Hiding that would leave an operator thinking they are looking at
- * raw data when they are looking at daily averages.
- *
- * **The operating-state filter is offered prominently.** This compressor is switched off
- * 55% of the time, so a chart that mixes idle and running periods shows a sawtooth that
- * says more about the duty cycle than about the sensor. Filtering to one state is what
- * makes a trend comparable over time.
+ * The operating-state filter is prominent because this compressor is off 55% of the
+ * time, and a chart mixing idle and running periods describes the duty cycle rather than
+ * the sensor.
  */
 
 import { useMemo, useState } from "react";
@@ -45,18 +40,12 @@ export function SensorExplorer() {
   const [chosenRange, setChosenRange] = useState<Range | null>(null);
   const [preset, setPreset] = useState<number | null>(24 * 7);
 
-  // Derived during render rather than assigned by an effect. Setting state inside an
-  // effect to react to a prop arriving causes a second render pass for a value that was
-  // already computable - and React now warns about it. The archive bounds arrive with
-  // the summary, so the default window is simply a function of them.
+  // Derived during render, and anchored to the archive's last reading rather than to
+  // today, since a "last 7 days" default over 2020 data would be empty.
   //
-  // The window anchors to the archive's last reading, not to today: against the wall
-  // clock this 2020 archive is years stale and a "last 7 days" default would be empty.
-  // useMemo is load-bearing here, not an optimisation. Without it the derived object
-  // has a new identity on every render, which resets useDebounced's timer, whose
-  // setState triggers another render, which derives another new object - a render loop
-  // that never settles and therefore never fires the fetch. Memoising on the two inputs
-  // that can actually change gives the object a stable identity.
+  // useMemo is load-bearing, not an optimisation: without it the object has a new
+  // identity every render, which resets useDebounced's timer, whose setState renders
+  // again. See DEV_LOG DL-041.
   const range: Range | null = useMemo(
     () => chosenRange ?? (archiveEnd ? rangeEndingAt(archiveEnd, 24 * 7) : null),
     [chosenRange, archiveEnd],

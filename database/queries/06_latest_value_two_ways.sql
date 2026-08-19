@@ -1,22 +1,11 @@
 /* =====================================================================================
    Q6 - Latest value per sensor, written two ways.
 
-   Purpose      A concrete example of why the shape of a query matters more than its
-                correctness once a table has 22.7 million rows. Both forms below return
-                identical results.
+   Form A (CROSS APPLY ... TOP 1 DESC) is one backward index seek per sensor. Form B
+   (ROW_NUMBER) must rank every row to discard all but fifteen. The optimiser cannot
+   rewrite B into A, because the window function is defined over the whole partition.
 
-   Form A (used in ts.vw_LatestReading): CROSS APPLY ... TOP 1 ORDER BY ReadingTs DESC.
-   With the clustered key (SensorId, ReadingTs) this is one BACKWARD index seek per
-   sensor. Fifteen sensors, fifteen seeks, a handful of pages read.
-
-   Form B: ROW_NUMBER() OVER (PARTITION BY SensorId ORDER BY ReadingTs DESC). This must
-   rank every row in the table to discard all but fifteen of them.
-
-   The optimiser cannot rewrite B into A: the window function is defined over the whole
-   partition, so the ranking is semantically required. Choosing the access pattern is
-   the engineer's job, not the optimiser's.
-
-   Run both with SET STATISTICS IO ON to see the difference in logical reads.
+   Run both with SET STATISTICS IO ON to see the difference.
    ===================================================================================== */
 
 -- ---- Form A: seek per sensor (preferred) --------------------------------------------

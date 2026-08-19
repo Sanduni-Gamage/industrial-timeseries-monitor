@@ -1,7 +1,6 @@
 """Generate the HTML data-quality report from the live database.
 
-Everything in the report is queried, never hard-coded, so a stale figure is impossible -
-if the archive changes, the report changes with it.
+Every figure is queried rather than hard-coded, so the report cannot go stale.
 
 Usage
 -----

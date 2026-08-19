@@ -1,17 +1,9 @@
 /* =====================================================================================
    Q1 - Time-window retrieval for one sensor, with quality filtering.
 
-   Purpose      The single most common request an operational system serves: "show me
-                this tag over this period." Everything the dashboard's trend chart does
-                starts here.
-
-   Access path  Clustered index seek on PK_SensorReading (SensorId, ReadingTs). The key
-                is tag-major then time-ordered, so this is one contiguous range read
-                with no sort - the reason that key was chosen over a surrogate id.
-
-   Note         The join to ref.QualityCode is what stops a held or out-of-range value
-                being silently averaged into an operator's decision. Readings are never
-                deleted; they are labelled, and the caller chooses.
+   Clustered index seek on (SensorId, ReadingTs): one contiguous range read, no sort.
+   The join to ref.QualityCode is what stops a held value being silently averaged into
+   an operator's decision.
    ===================================================================================== */
 
 DECLARE @SensorCode VARCHAR(32) = 'TP3';

@@ -1,21 +1,18 @@
 """Create the application database and apply schema, seed, indexes and views.
 
-Idempotent end to end: every SQL file guards its own objects, so re-running this is a
-no-op against an already-provisioned database. That property is what makes it safe to
-call from ``setup.ps1`` and from CI.
+Idempotent end to end: every SQL file guards its own objects, so re-running is a no-op
+against an already-provisioned database.
 
 Usage
 -----
-    python scripts/init_database.py                 # create DB (if needed), schema + seed
-    python scripts/init_database.py --with-indexes  # also apply indexes.sql
-    python scripts/init_database.py --with-views    # also apply views.sql
+    python scripts/init_database.py                   # create DB (if needed), schema + seed
+    python scripts/init_database.py --with-indexes    # also apply indexes.sql
+    python scripts/init_database.py --with-views      # also apply views.sql
     python scripts/init_database.py --with-historian  # also apply historian.sql
-    python scripts/init_database.py --all           # everything
-    python scripts/init_database.py --drop-first    # DESTRUCTIVE, requires --confirm-drop
+    python scripts/init_database.py --all             # everything
+    python scripts/init_database.py --drop-first      # DESTRUCTIVE, requires --confirm-drop
 
-Exit codes
-----------
-0 success · 1 failure · 2 usage error
+Exit codes: 0 success · 1 failure · 2 usage error
 """
 
 from __future__ import annotations

@@ -1,6 +1,6 @@
 """Trend statistics: rolling mean, rolling spread, and rate of change.
 
-Everything here reads the **aggregate archive**, never the 22.7-million-row fact table.
+Everything here reads the aggregate archive, never the 22.7-million-row fact table.
 A rolling window over raw readings is correct and unusable; over hourly buckets it is
 instant and at the resolution anyone actually looks at a trend.
 

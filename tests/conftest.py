@@ -1,6 +1,6 @@
 """Shared fixtures.
 
-Every test in this suite runs **without a database**. That is deliberate: the validation
+Every test in this suite runs without a database. That is deliberate: the validation
 and transformation logic is where the bugs live, it is pure, and keeping it testable
 without SQL Server means CI needs no paid infrastructure and the suite runs in seconds.
 

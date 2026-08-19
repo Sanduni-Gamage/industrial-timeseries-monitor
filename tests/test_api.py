@@ -1,6 +1,6 @@
 """API tests.
 
-Every test here runs **without SQL Server**. The routes depend on a `Repository`
+Every test here runs without SQL Server. The routes depend on a `Repository`
 provided through FastAPI's dependency system, so a fake is substituted with
 `app.dependency_overrides`. That is the whole reason the repository exists as a seam:
 the entire HTTP surface - status codes, error shapes, pagination, resolution selection -

@@ -152,16 +152,11 @@ def iter_chunks(
     *,
     chunk_rows: int,
 ) -> Iterator[pd.DataFrame]:
-    """Yield the source file in chunks with timestamps parsed and a line number attached.
+    """Yield the source file in chunks, timestamps parsed, line numbers attached.
 
-    Each yielded frame carries:
-      - ``timestamp``      parsed to datetime64, ``NaT`` where unparseable
-      - ``source_index``   the original 1 Hz scan ordinal from the file
-      - ``source_line_no`` 1-based line number in the file, for quarantine traceability
-      - one float column per sensor, named by its ``SourceColumn``
-
-    Unparseable timestamps become ``NaT`` rather than raising, so they can be counted
-    and quarantined instead of killing the whole read.
+    Each frame carries ``timestamp`` (NaT where unparseable), ``source_index``,
+    ``source_line_no`` for quarantine traceability, and one float column per sensor.
+    Unparseable timestamps become NaT rather than raising, so they can be quarantined.
     """
     signal_columns = [sensor.source_column for sensor in sensors]
 

@@ -1,11 +1,10 @@
 /* =====================================================================================
    Secondary indexes.
-
-   Applied AFTER ingestion, not before. Maintaining a columnstore index during a
-   22.7-million-row load costs far more than building it once at the end, so
-   scripts/init_database.py leaves this file until the data is in place.
-
-   Idempotent: every index is guarded, so re-running is a no-op.
+   
+   Applied after ingestion, not before: maintaining a columnstore during a
+   22.7-million-row load costs far more than building it once at the end.
+   
+   Idempotent, every index guarded.
    ===================================================================================== */
 
 SET NOCOUNT ON;

@@ -1,14 +1,13 @@
 """Run the analytics pipeline: operating states, baselines, detection, reporting.
 
-Order matters and each stage depends on the one before it:
+Each stage depends on the one before it, and every stage rebuilds its own output rather
+than appending, so the script is safe to re-run.
 
     1. operating state   every scan classified from motor current
     2. aggregates        state-aware hourly rollups (SQL)
     3. baselines         per sensor, per state, over the reference window
     4. detection         adaptive / fixed-baseline / documented setpoint
     5. summary           alarm rates judged against EEMUA 191 guidance
-
-Safe to re-run: every stage rebuilds its own output rather than appending.
 
 Usage
 -----

@@ -1,17 +1,11 @@
 /* =====================================================================================
    Q9 - Sensor quality-code breakdown per day (PIVOT).
 
-   Purpose      A per-day, per-sensor view of how trustworthy the archive is. This is the
-                query behind the dashboard's Data Quality screen.
+   The source declares has_missing_values = "no" and cell-wise that is true, but 50,855
+   readings are held values from a frozen logger. Completeness is not correctness, and
+   this is where the difference becomes visible.
 
-   Why it matters here: the source metadata declares has_missing_values = "no", and
-   cell-wise that is true - there is not one null in 22.7 million readings. But 50,855
-   of them are held values from a frozen logger. Completeness is not correctness, and
-   this breakdown is where the difference becomes visible.
-
-   Technique    PIVOT with a fixed column list. The alternative - conditional aggregation
-                with SUM(CASE WHEN ...) - is equivalent and often clearer; PIVOT is shown
-                because the fixed set of quality codes is exactly the case it suits.
+   PIVOT with a fixed column list, which is the case it suits.
    ===================================================================================== */
 
 DECLARE @From DATETIME2(3) = '2020-06-20T00:00:00';

@@ -1,7 +1,7 @@
 /**
  * Status indicators and stat tiles.
  *
- * The rule these enforce: **status is never colour alone.** Every badge carries a glyph
+ * The rule these enforce: status is never colour alone. Every badge carries a glyph
  * and a word as well as a colour, so it survives colour-vision deficiency, greyscale
  * printing and forced-colours mode. Two of the four status colours sit below 3:1 contrast
  * on the light surface by design - the icon-plus-label pairing is what makes that safe.

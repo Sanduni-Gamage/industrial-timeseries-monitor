@@ -1,26 +1,11 @@
 """Sensor behaviour around the four documented air-leak events.
 
-What this can and cannot establish, stated before any numbers:
+Four failures of one mode, and event #1's lead-up is entirely held data, so three are
+usable. That cannot validate a predictive model and none is attempted; this is a
+descriptive comparison only.
 
-The dataset documents **four** failures, all the same mode (air leak, high stress).
-Profiling then showed that the 12-, 6- and 1-hour run-ups to event #1 are **100% held
-data** from a frozen logger, so three events remain usable for lead-up analysis. Three
-events of one failure mode cannot validate a predictive model. There is no train/test
-split here that would mean anything, and none is attempted.
-
-What three events *can* support is a descriptive comparison: did the signals behave
-differently before these failures than during comparable failure-free periods? That is a
-real question with a real answer, and it is worth more than a fabricated accuracy figure.
-
-Two traps this module is built to avoid:
-
-1. **Averaging held data.** Every window reports its usable sample count, and a window
-   with less than half usable data returns no statistic at all.
-2. **Confusing duty cycle with signal.** An air leak makes the compressor run more often.
-   So a rise in mean pressure across a whole window may be nothing but a longer duty
-   cycle. Comparisons are therefore made *within operating state*, which asks the
-   different and more interesting question: was the machine's behaviour abnormal *while
-   it was doing the same thing*?
+Two traps it avoids: averaging held data (windows under 50% usable return nothing), and
+mistaking duty cycle for signal (comparisons are made within operating state).
 """
 
 from __future__ import annotations
@@ -172,13 +157,9 @@ def analyse_windows(conn: pyodbc.Connection) -> list[WindowStat]:
 def anomaly_lead_time(conn: pyodbc.Connection, *, horizon_hours: int = 24) -> pd.DataFrame:
     """Do detected anomalies concentrate before failures, or are they everywhere?
 
-    This is the honest version of "does it predict failures". It measures the anomaly
-    rate inside the run-up windows against the rate over the rest of the archive. A ratio
-    near 1 means the detector has no relationship with these failures at all - a result
-    worth reporting plainly if that is what comes out.
-
-    It is an association, over three usable events. It is not a validated model, and no
-    precision or recall figure derived from three positives would mean anything.
+    Measures the anomaly rate inside the run-up windows against the rest of the archive.
+    A ratio near 1 means no relationship, which is worth reporting plainly. An association
+    over three events, not a validated model.
     """
     events = load_events(conn)
     windows = [

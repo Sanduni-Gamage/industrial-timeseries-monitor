@@ -1,16 +1,12 @@
 """End-to-end proof that bad data is quarantined rather than lost.
 
-The unit tests in ``test_validation.py`` prove the validator makes the right decision.
-They do not prove the decision survives the trip to SQL Server - `write_rejected` and the
-issue writer had never executed once, because the real MetroPT-3 file is clean enough
-that no row was ever rejected during a real load.
+test_validation.py proves the validator decides correctly. It does not prove the
+decision survives the trip to SQL Server: write_rejected had never executed once,
+because the real file is clean enough that no row is ever rejected.
 
-This test drives the **whole pipeline** against a deliberately corrupted file and then
-queries the database to confirm every problem landed somewhere it can be found.
-
-It builds and drops its own database, so it cannot touch a real load. It is skipped
-automatically when no SQL Server is reachable, which keeps `pytest` green on a clean
-clone and in CI.
+This drives the whole pipeline against a deliberately corrupted file, then queries the
+database to confirm every problem landed somewhere findable. It builds and drops its own
+database, and skips when no SQL Server is reachable.
 """
 
 from __future__ import annotations

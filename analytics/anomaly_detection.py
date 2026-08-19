@@ -1,41 +1,11 @@
-"""Anomaly detection, with the alarm discipline that makes it usable.
+"""Anomaly detection with the alarm discipline that makes it usable.
 
-Detection is the easy half. The hard half is not drowning the operator, and the
-measurements below drove every design choice here.
+Naive per-state IQR fences flag 15.13% of readings, about 7,300 alarms a day against the
+EEMUA 191 / ISA-18.2 ceiling of roughly 150. This module uses a trailing same-state
+window (drift), median/MAD (robustness), hourly buckets, and an ISA-18.2 on-delay,
+reaching 12.5 a day. The fixed-baseline detector is kept alongside for comparison.
 
-**What a naive implementation produces.** Comparing every reading against its own
-per-operating-state 1.5x IQR fence - already far better than a global fence - flags
-**1,553,181 readings, 15.13% of the archive**. `MOTOR_CURRENT` while OFF flags 50.4% of
-its readings; `OIL_TEMPERATURE` while LOADED flags 68.4%. That is roughly 7,300 alarms
-per day. EEMUA 191 and ISA-18.2 put the manageable ceiling at around 150 alarms per day
-per operator, with ~300 the absolute maximum. A naive detector overshoots by a factor of
-about fifty, and an alarm system nobody can read is worse than none: it teaches people to
-ignore it.
-
-**Why the naive version fails, specifically.** Two measured causes, neither obvious:
-
-1. *The machine's normal behaviour drifts.* Mean oil temperature under load is 54.97 C in
-   February and 64.8-70.1 C from March onward. A fixed February baseline therefore flags
-   most of the year as abnormal - correctly identifying a change, and completely
-   misidentifying it as a fault.
-2. *IQR fences collapse on tightly-peaked signals.* `MOTOR_CURRENT` while OFF has
-   P25 = 0.0350 A and P75 = 0.0375 A, so 1.5x IQR gives a fence 0.01 A wide against a
-   standard deviation of 0.0088 A. The fence is narrower than the instrument's own
-   scatter.
-
-**What this module does instead.**
-
-- *Adaptive* comparison against a trailing window of the same sensor in the same
-  operating state, so seasonal and operational drift is normal rather than alarming.
-- *Robust* statistics - median and MAD, not mean and standard deviation - so a handful of
-  extreme readings cannot inflate the limit that is meant to catch them.
-- *Hourly* evaluation, because a 10-second excursion is not an operational event.
-- *Persistence*, the ISA-18.2 on-delay: a condition must hold for several consecutive
-  buckets before it becomes an alarm. This is what removes chatter.
-
-The fixed-baseline IQR detector is kept as well, because it is what the brief asked for
-and because comparing the two is the point - but it is applied at hourly resolution with
-the same persistence rule, and its flag rate is reported honestly.
+Measurements and reasoning: docs/ANALYTICS_FINDINGS.md.
 """
 
 from __future__ import annotations
@@ -162,14 +132,9 @@ def detect_adaptive_mad(
 ) -> list[Anomaly]:
     """Primary detector: robust z-score against a trailing same-state window.
 
-    For each (sensor, operating state) series of hourly averages, compare the current
-    bucket against the median and MAD of the preceding *window* buckets. Median and MAD
-    rather than mean and standard deviation because a developing fault inflates the very
-    statistics meant to detect it - a few extreme hours widen a standard deviation enough
-    to hide themselves. The median barely moves.
-
-    The window is trailing and exclusive of the current bucket, so a reading is never
-    compared against a baseline it helped create.
+    Median and MAD rather than mean and standard deviation, because a developing fault
+    inflates the very statistics meant to detect it. The window excludes the current
+    bucket, so a reading is never compared against a baseline it helped create.
     """
     frame = _load_state_hourly(conn)
     if frame.empty:
@@ -229,14 +194,9 @@ def detect_baseline_iqr(
 ) -> list[Anomaly]:
     """Fixed-baseline IQR against the February reference window.
 
-    Included because the brief asked for IQR detection, and because the contrast with the
-    adaptive detector is instructive rather than decorative. It answers a different
-    question: not "is this unusual lately?" but "how far has this drifted from where it
-    started?" - which is a legitimate question, just not an alarm.
-
-    Degenerate baselines (zero IQR, typical of digital tags and of signals that never
-    move in a given state) are skipped: their fences collapse onto a single value and
-    every reading that is not exactly that value becomes an outlier.
+    Kept for contrast: it asks how far a signal has drifted from where it started, which
+    is a legitimate question but not an alarm. Degenerate baselines (zero IQR) are
+    skipped, since their fences collapse onto a single value.
     """
     frame = _load_state_hourly(conn)
     if frame.empty:
@@ -293,19 +253,11 @@ def detect_baseline_iqr(
 
 
 def detect_setpoint(conn: pyodbc.Connection) -> list[Anomaly]:
-    """Documented manufacturer setpoints - the only truly non-statistical detector.
+    """Documented manufacturer setpoints, the only non-statistical detector.
 
-    The dataset documentation states two real setpoints outright:
-
-      - ``LPS`` "detects and activates when the pressure drops below 7 bars"
-      - ``MPG`` starts the compressor "when the pressure in the APU falls below 8.2 bar"
-
-    These are values the equipment owner published, not thresholds anyone here chose,
-    which makes this the most defensible detector in the module. A low-pressure event on
-    an air production unit is an operational fact regardless of what any baseline says.
-
-    Reported per contiguous episode rather than per scan: a single alarm saying "pressure
-    was below 7 bar for 40 minutes" is useful; 240 identical alarms are not.
+    LPS activates below 7 bar and MPG starts the compressor below 8.2 bar, both stated by
+    the equipment owner rather than chosen here. Reported per contiguous episode, because
+    240 identical alarms are not useful and one saying "below 7 bar for 40 minutes" is.
     """
     rows = fetch_all(
         conn,

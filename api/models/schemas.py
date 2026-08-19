@@ -1,15 +1,7 @@
-"""Response contracts.
+"""Pydantic response models.
 
-These models are the API's public surface, so they are written for the consumer rather
-than mirroring the database. Two conventions run through all of them:
-
-**Every aggregated number is accompanied by what produced it.** An hourly average built
-from twelve samples is not the same number as one built from 360, and a client that
-cannot tell them apart will draw both as an equally confident line. Sample counts and
-coverage travel with the values.
-
-**Quality is never hidden.** A reading that failed validation is returned with its
-quality code rather than filtered out silently, so the caller decides what to trust.
+These are the API contract. The dashboard's TypeScript types are generated from the
+OpenAPI document these produce, so a change here that is not regenerated fails CI.
 """
 
 from __future__ import annotations

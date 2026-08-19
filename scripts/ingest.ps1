@@ -3,13 +3,11 @@
     Load the MetroPT-3 archive into SQL Server.
 
 .DESCRIPTION
-    Validates the environment before starting, runs the Python ingestion pipeline, then
-    reports what actually landed by querying the run ledger rather than trusting the
-    pipeline's own console output.
+    Runs the ingestion pipeline, then reports what landed by querying the run ledger
+    rather than trusting the pipeline's console output.
 
-    Loading is idempotent. Running this twice is safe: the second run recognises the file
-    by its SHA-256 and stops in seconds. Use -Force to re-process it anyway; even then it
-    inserts nothing that is already present.
+    Idempotent: a second run recognises the file by its SHA-256 and stops in seconds.
+    -Force re-processes it anyway and still inserts nothing already present.
 
 .PARAMETER CsvPath
     Override the source file. Defaults to METROPT_RAW_CSV from .env.

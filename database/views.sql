@@ -1,13 +1,12 @@
 /* =====================================================================================
    Views.
-
-   Idempotent via CREATE OR ALTER, which SQL Server has supported since 2016 SP1 - it
-   avoids the DROP-then-CREATE dance that briefly leaves dependent objects broken.
-
-   A note on what is deliberately NOT here: there is no view that scans the full 22.7M
-   row fact table without a predicate. Views that look cheap and scan everything are how
-   a dashboard ends up timing out in front of an operator. Anything trend-shaped reads
-   the aggregate archive; anything raw-shaped requires a time window from the caller.
+   
+   Idempotent via CREATE OR ALTER, avoiding the DROP-then-CREATE dance that briefly leaves
+   dependent objects broken.
+   
+   Deliberately absent: any view that scans the full fact table without a predicate.
+   Anything trend-shaped reads the aggregate archive; anything raw-shaped requires a time
+   window from the caller.
    ===================================================================================== */
 
 SET NOCOUNT ON;
@@ -15,11 +14,10 @@ GO
 
 /* -------------------------------------------------------------------------------------
    1. ts.vw_LatestReading - the current value of every sensor.
-
-   CROSS APPLY ... TOP 1 rather than ROW_NUMBER(). With the clustered key
-   (SensorId, ReadingTs) this is one backward index seek per sensor: 15 seeks total.
-   ROW_NUMBER() OVER (PARTITION BY SensorId ORDER BY ReadingTs DESC) would rank all
-   22.7 million rows to discard all but 15 of them.
+   
+   CROSS APPLY ... TOP 1 rather than ROW_NUMBER(): with the clustered key this is one
+   backward index seek per sensor, 15 in total, against ranking 22.7 million rows to
+   discard all but 15.
    ------------------------------------------------------------------------------------- */
 
 CREATE OR ALTER VIEW ts.vw_LatestReading
@@ -56,10 +54,9 @@ GO
 
 /* -------------------------------------------------------------------------------------
    2. analytics.vw_HourlyAverage - hourly trend with coverage.
-
-   CoveragePct is the honest part. A full hour at the measured 10 s sampling interval is
-   360 samples; this archive is only 82% covered, so many buckets hold far fewer. Showing
-   an average without showing how much data produced it invites false confidence.
+   
+   CoveragePct is the honest part. A full hour is 360 samples at 10 s and this archive is
+   82% covered, so an average without its sample count invites false confidence.
    ------------------------------------------------------------------------------------- */
 
 CREATE OR ALTER VIEW analytics.vw_HourlyAverage
@@ -116,10 +113,9 @@ GO
 
 /* -------------------------------------------------------------------------------------
    4. ts.vw_SensorMinMax - lifetime extremes, and when they happened.
-
-   Built from the daily aggregate, not the fact table: the extremes of the daily minima
-   are the extremes of the underlying values, so this is exact rather than approximate,
-   and it reads ~3,000 rows instead of 22.7 million.
+   
+   Built from the daily aggregate: the extremes of the daily minima are the extremes of
+   the underlying values, so this is exact and reads ~3,000 rows instead of 22.7 million.
    ------------------------------------------------------------------------------------- */
 
 CREATE OR ALTER VIEW ts.vw_SensorMinMax
@@ -165,13 +161,10 @@ GO
 
 /* -------------------------------------------------------------------------------------
    5. analytics.vw_RollingStats - 24-hour rolling mean and standard deviation.
-
-   Window functions over the HOURLY aggregate, never over the raw archive. A rolling
-   window across 22.7M raw rows would be correct and unusable; across ~76,000 hourly
-   buckets it is instant, and at the resolution any human actually looks at a trend.
-
-   RateOfChange is the hour-on-hour delta, which is what an operator means by "is it
-   drifting?" - the absolute value matters less than the slope.
+   
+   Window functions over the hourly aggregate, never the raw archive: correct either way,
+   usable only one way. RateOfChange is the hour-on-hour delta, which is what an operator
+   means by "is it drifting?".
    ------------------------------------------------------------------------------------- */
 
 CREATE OR ALTER VIEW analytics.vw_RollingStats
@@ -204,11 +197,10 @@ GO
 
 /* -------------------------------------------------------------------------------------
    6. analytics.vw_AbnormalReading - hourly buckets outside their baseline.
-
+   
    Compares against analytics.SensorBaseline, so a threshold is always a stored,
-   documented, reproducible number rather than a literal in a query. Returns nothing
-   until baselines are computed (Phase 3), which is the correct behaviour: no baseline
-   means no defensible notion of "abnormal".
+   reproducible number. Returns nothing until baselines exist, which is correct: no
+   baseline means no defensible notion of "abnormal".
    ------------------------------------------------------------------------------------- */
 
 CREATE OR ALTER VIEW analytics.vw_AbnormalReading
@@ -298,14 +290,12 @@ CROSS APPLY (
     WHERE v.EquipmentId = e.EquipmentId
 ) AS archive
 OUTER APPLY (
-    /* ACTIVE anomalies only - the last 24 hours of the archive, not its whole history.
-       The first version of this view counted every anomaly ever detected, so a machine
-       that had one bad afternoon in March showed as CRITICAL forever. A health indicator
-       that can never return to NORMAL tells an operator nothing.
-
-       "Now" is the archive's own last reading rather than the wall clock, because this
-       is historical data: against the wall clock every reading is stale and the panel
-       would be permanently blank. */
+    /* ACTIVE anomalies only - the last 24 hours of the archive, not its whole history. The
+   first version counted every anomaly ever detected, so a machine that had one bad
+   afternoon in March showed as CRITICAL forever.
+   
+   "Now" is the archive's last reading rather than the wall clock, because against the
+   wall clock every reading is stale and the panel would be permanently blank. */
     SELECT SUM(CASE WHEN an.Severity = 'CRITICAL' THEN 1 ELSE 0 END) AS CriticalCount,
            SUM(CASE WHEN an.Severity = 'WARNING'  THEN 1 ELSE 0 END) AS WarningCount
     FROM analytics.Anomaly AS an
@@ -321,14 +311,13 @@ GO
 
 /* -------------------------------------------------------------------------------------
    8. ops.vw_DataQualitySummary - issue counts per ingestion run.
-
-   Two kinds of row live in ops.DataQualityIssue and they must never be added together.
-   A *detail* row describes one specific event - this gap, this frozen block. A *summary*
-   row carries the exact run total for its issue type. Summing AffectedRows across both
-   double-counts every issue: a run with one 6-row flatline reported 12.
-
-   So AffectedRows here comes from the summary rows only, and the detail rows are counted
-   separately as DetailRows. The IsSummary flag exists precisely to keep these apart.
+   
+   Two kinds of row live in ops.DataQualityIssue and must never be added together. A
+   detail row describes one event; a summary row carries the run total for its issue type.
+   Summing both double-counts: a run with one 6-row flatline reported 12.
+   
+   AffectedRows therefore comes from summary rows only, with detail rows counted
+   separately. The IsSummary flag exists to keep them apart.
    ------------------------------------------------------------------------------------- */
 
 CREATE OR ALTER VIEW ops.vw_DataQualitySummary
@@ -364,10 +353,9 @@ GO
 
 /* -------------------------------------------------------------------------------------
    9. ops.vw_TimestampGap - where the archive has no data.
-
-   Reads the recorded GAP issues rather than re-deriving gaps with LAG() over the fact
-   table. The gaps were already found once, exactly, during ingestion; finding them
-   again on every dashboard load would be a full scan to reproduce a known answer.
+   
+   Reads the GAP issues recorded at ingestion rather than re-deriving them with LAG().
+   Finding them again per dashboard load would be a full scan for a known answer.
    ------------------------------------------------------------------------------------- */
 
 CREATE OR ALTER VIEW ops.vw_TimestampGap
@@ -385,13 +373,12 @@ FROM ops.DataQualityIssue AS i
 WHERE i.IssueType = 'GAP'
   AND i.IsSummary = 0
   AND i.WindowStartTs IS NOT NULL
-  /* Scoped to the most recent FULL run. PARTIAL runs are explicit --limit-days dev
-     subsets and must not define the archive's quality picture: after one 1-day test
-     run the report claimed the whole archive had 2 gaps.
-     Scoped to a single run because Each run re-detects the same gaps in the
-     same file, so without this the archive appears to gain 331 new gaps every time
-     ingestion is re-run: after two runs the report claimed 664. A gap is a property of
-     the data, not of how many times it was loaded. */
+  /* Scoped to the most recent FULL run. PARTIAL runs are --limit-days dev subsets and must
+   not define the archive's quality picture: after one 1-day test run the report claimed
+   the whole archive had 2 gaps.
+   
+   Scoped to a single run because each run re-detects the same gaps in the same file.
+   Without this the archive appears to gain 331 new gaps every time ingestion runs. */
   AND i.IngestionRunId = (
         SELECT MAX(IngestionRunId) FROM ops.IngestionRun
         WHERE Status = 'SUCCEEDED'
@@ -400,11 +387,10 @@ GO
 
 /* -------------------------------------------------------------------------------------
    10. ops.vw_FailureContext - failure events with their surrounding data coverage.
-
-   Answers the question that has to be asked before any pre-failure analysis: is there
-   enough usable data in the run-up to this event to say anything at all? Profiling found
-   69.5% of event #1's 24-hour lead-up is held (frozen) data, so for that event the
-   answer is no. Making that visible in a view stops it being forgotten later.
+   
+   Answers the question that precedes any pre-failure analysis: is there enough usable
+   data in the run-up to say anything? For event #1, whose 24-hour lead-up is 69.5% frozen
+   data, the answer is no. A view makes that hard to forget.
    ------------------------------------------------------------------------------------- */
 
 CREATE OR ALTER VIEW ops.vw_FailureContext

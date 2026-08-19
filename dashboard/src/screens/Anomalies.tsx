@@ -1,13 +1,12 @@
 /**
  * Anomalies - a filterable, paginated list of readings outside their expected range.
  *
- * Terminology is deliberate. The screen says "flagged reading", "expected range" and
- * "how far outside", never "z-score", "MAD" or "isolation forest". The method is shown
- * because it answers a real operator question - *which* rule fired - but it is labelled
- * in plain words and explained inline.
+ * Terminology is deliberate: "flagged reading", "expected range", "how far outside",
+ * never "z-score" or "MAD". The method is shown, because which rule fired is a real
+ * operator question, but it is labelled in plain words.
  *
- * Every row shows the value **and** the range it was expected to be in. A flag without
- * the expectation behind it is not actionable.
+ * Every row shows the value and the range it was expected in. A flag without the
+ * expectation behind it is not actionable.
  */
 
 import { useState } from "react";

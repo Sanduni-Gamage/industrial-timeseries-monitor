@@ -3,25 +3,15 @@
     Shared helpers for the operational PowerShell scripts.
 
 .DESCRIPTION
-    Targets **Windows PowerShell 5.1**, which is what is installed on the target machine.
-    That rules out several things that look normal in modern examples and are syntax
-    errors here:
+    Targets Windows PowerShell 5.1, so no && or ||, no ternary, no ?? or ?., and no
+    ConvertFrom-Json -AsHashtable.
 
-      * pipeline chain operators `&&` and `||`
-      * the ternary `? :`, null-coalescing `??`, and null-conditional `?.`
-      * `ConvertFrom-Json -AsHashtable`
+    Two constraints are baked in. sqlcmd is not on PATH, so SQL goes through
+    System.Data.SqlClient directly. And connecting is separated from querying, because a
+    try wrapping both reports a broken query as a connection failure (DEV_LOG DL-001).
 
-    Two hard-won constraints are baked into this module:
-
-      * **`sqlcmd` is not on PATH**, so SQL access goes through `System.Data.SqlClient`
-        directly. Nothing here shells out to a tool that may not exist.
-      * **Connecting and querying are separated.** A `try` wrapping both reports a broken
-        query as a connection failure, which sent an early diagnosis in completely the
-        wrong direction (see docs/DEV_LOG.md DL-001). `Test-SqlConnection` reports which
-        of the two actually failed.
-
-    Configuration is read from the same `.env` file the Python code uses, so the two
-    halves of the system cannot drift apart.
+    Configuration comes from the same .env the Python code reads, so the two halves
+    cannot drift apart.
 
 .NOTES
     Exit codes used by every script in this folder:

@@ -1,7 +1,7 @@
 /**
  * Time-range control.
  *
- * Presets are relative to the **end of the archive**, not to the wall clock. This is a
+ * Presets are relative to the end of the archive, not to the wall clock. This is a
  * historical dataset ending in September 2020, so a "last 7 days" measured from today
  * would return nothing and read as a broken dashboard. The control says which anchor it
  * is using, rather than leaving the operator to work it out.

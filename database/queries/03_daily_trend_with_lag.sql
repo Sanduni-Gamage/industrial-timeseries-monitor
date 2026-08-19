@@ -1,15 +1,9 @@
 /* =====================================================================================
    Q3 - Day-over-day trend and percentage change.
 
-   Purpose      "Is this drifting?" is a different question from "what is it now?", and
-                it is the one that matters for condition monitoring. An oil temperature
-                of 70 C means little on its own; 70 C after a week at 62 C means a lot.
-
-   Technique    LAG() over the daily aggregate. Reading the aggregate archive rather than
-                the fact table turns a 22.7-million-row scan into a 212-row one.
-
-   Guard        NULLIF on the denominator: day one has no predecessor, and a sensor that
-                legitimately averages zero would otherwise divide by it.
+   "Is this drifting?" matters more than "what is it now?". LAG() over the daily
+   aggregate turns a 22.7M-row scan into a 212-row one. NULLIF guards day one and any
+   sensor that legitimately averages zero.
    ===================================================================================== */
 
 DECLARE @SensorCode VARCHAR(32) = 'OIL_TEMPERATURE';

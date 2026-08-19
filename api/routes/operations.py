@@ -67,14 +67,9 @@ def _failure(row: tuple) -> FailureEvent:
 def health(response: Response) -> HealthResponse:
     """Report whether the API can actually serve requests.
 
-    Deliberately does **not** use the repository dependency: that dependency opens a
-    connection, so a database outage would fail before the handler ran and return a
-    generic 503 with no detail about which component is down. The check owns its own
-    connection so it can report precisely.
-
-    Returns 503 when the database is unreachable or a required table is missing, because
-    a monitoring system needs the status code - a body saying "unhealthy" behind a 200 is
-    not actionable.
+    Owns its own connection rather than using the repository dependency, which would fail
+    before the handler ran and lose the detail of which component is down. Returns 503 on
+    an unreachable database, because a monitoring system needs the status code.
     """
     components: list[ComponentHealth] = []
     overall: Literal["healthy", "degraded", "unhealthy"] = "healthy"

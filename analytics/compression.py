@@ -1,38 +1,13 @@
-"""Swinging-door compression - the algorithm that makes a historian a historian.
+"""Swinging-door compression, the mechanism that makes a historian a historian.
 
-A time-series database with timestamps in it is a table. What distinguishes a process
-historian is that it does **not** store every reading: it stores only the readings a
-straight line cannot reconstruct within a stated tolerance, and it guarantees that bound.
-Typical plant deployments retain 1-10% of raw samples.
+A historian stores only readings a straight line cannot reconstruct within a stated
+tolerance. From an anchor point, track the range of slopes that keep every subsequent
+reading within +/-E; when that range closes, archive the previous point.
 
-**Swinging Door Trending (SDT)** is the classic formulation, used by PI and its
-descendants. It is easier to state as geometry than as code.
+Two departures from the textbook: a gap closes the door, and so does a quality change.
+Neither may be spanned by a line, because the reconstruction would invent a measurement.
 
-Given a last-archived point ``(t0, y0)`` and a deviation ``E``, a candidate straight line
-from that point must pass within ``±E`` of every reading since. For each subsequent point
-``(ti, yi)`` that constrains the line's slope to::
-
-    s >= (yi - E - y0) / (ti - t0)      it must not dip below the point's lower bound
-    s <= (yi + E - y0) / (ti - t0)      nor rise above its upper bound
-
-Track the tightest lower bound seen so far and the tightest upper bound. While the two
-still overlap, some line exists that covers every point, so none of them need storing -
-the "door" is still open. The moment the lower bound exceeds the upper bound, no such line
-exists: the door has closed, and the **previous** point is archived as the new anchor.
-
-Two deliberate departures from the textbook version, both consistent with how the rest of
-this project treats missing data:
-
-1. **A gap forces the door shut.** Interpolating across a 48-hour hole would invent a
-   straight line through a period when nothing was recorded. The rest of this codebase
-   refuses to do that, and so does this.
-2. **A quality change forces the door shut.** A stretch of held (frozen) data must not be
-   spanned by a line drawn from a genuine reading, because the reconstruction would look
-   like real measurement.
-
-The error bound is verified rather than asserted: :func:`reconstruction_error` rebuilds
-the full series from the retained points and reports the worst deviation. If that ever
-exceeds ``E``, the implementation is wrong.
+The bound is verified rather than asserted. See docs/HISTORIAN_CONCEPTS.md.
 """
 
 from __future__ import annotations
@@ -91,27 +66,13 @@ def swinging_door(
 ) -> CompressionResult:
     """Compress one series, returning the indices worth keeping.
 
-    Parameters
-    ----------
-    seconds:
-        Timestamps as float seconds, strictly increasing.
-    values:
-        Readings, same length.
-    deviation:
-        Half-width of the error corridor, in the sensor's own units. Every discarded
-        point is guaranteed to lie within this distance of the reconstructed line.
-    quality:
-        Optional per-reading quality code. A change forces the door shut so a line is
-        never drawn from a trusted reading across a stretch of held data.
-    gap_seconds:
-        A step longer than this closes the door. Nothing is interpolated across a gap.
-
-    The first and last points of a series are always retained: without the last one the
-    reconstruction would stop short of the data it is meant to represent.
+    ``deviation`` is the half-width of the error corridor in the sensor's own units, and
+    every discarded point is guaranteed within it. A quality change or a step longer than
+    ``gap_seconds`` closes the door, so no line spans held data or a gap. First and last
+    points are always retained.
     """
     if seconds.size != values.size:
-        # An IndexError three loops deep is a poor way to learn that two arrays came from
-        # different queries. Fail at the boundary with the sizes named.
+        # Fail at the boundary, not three loops deep.
         raise ValueError(
             f"seconds and values must be the same length: {seconds.size} vs {values.size}"
         )
@@ -135,17 +96,14 @@ def swinging_door(
     for i in range(1, count):
         elapsed = seconds[i] - seconds[anchor]
 
-        # Two discontinuities force the door shut regardless of the corridor. Written as
-        # two named conditions rather than one combined expression: the combined form
-        # relies on `and` binding tighter than `or`, which is correct and is exactly the
-        # kind of line that gets misread during a later edit.
+        # Two named conditions rather than one combined expression, which would rely on
+        # `and` binding tighter than `or` and get misread in a later edit.
         crosses_gap = seconds[i] - seconds[i - 1] > gap_seconds
         changes_quality = quality is not None and quality[i] != quality[i - 1]
 
         if crosses_gap or changes_quality:
-            # Archive the point before the discontinuity, then re-anchor on the point
-            # after it. Both are needed: one closes the previous segment, the other opens
-            # the next without a line spanning the break.
+            # Close the previous segment, then re-anchor after the break so no line
+            # spans it.
             if kept[-1] != i - 1:
                 kept.append(i - 1)
             kept.append(i)
@@ -193,26 +151,10 @@ def _enforce_error_bound(
 ) -> np.ndarray:
     """Split any segment whose reconstruction exceeds the deviation.
 
-    **Why this pass exists**, because it is not in the textbook algorithm and the
-    difference is easy to miss:
-
-    The swinging door guarantees that *some* straight line from the anchor stays within
-    ``E`` of every point in the segment. It does not guarantee that the line actually
-    drawn at reconstruction time - the chord between the two archived endpoints - is that
-    line. The chord is pinned to the endpoints, and a feasible corridor line is not, so
-    the two can differ. The documented worst case for chord reconstruction is **2E**, and
-    a test with noise just under the deadband reproduced it: a 0.05 corridor produced a
-    0.0561 error.
-
-    Historians live with that, because the whole point of SDT is that it runs online in
-    one pass over a stream and never revisits a decision. This project compresses a
-    complete archive in batch, so it can afford to check its own work: each segment is
-    verified against the chord, and any that exceeds the bound is split at its worst point
-    until it does not.
-
-    The cost is measured rather than assumed - see the refinement counts reported by
-    ``scripts/run_compression.py``. In practice it touches a small fraction of segments
-    and buys a guarantee that is true rather than approximately true.
+    Not in the textbook algorithm. The swinging door guarantees some line from the anchor
+    stays within E; reconstruction draws the chord between the archived endpoints, which
+    is a different line and can deviate up to 2E. A streaming historian cannot revisit
+    that decision. Compressing in batch can. See DEV_LOG DL-043.
     """
     if indices.size < 2 or deviation <= 0:
         return indices

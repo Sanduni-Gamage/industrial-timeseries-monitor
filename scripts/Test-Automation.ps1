@@ -3,21 +3,15 @@
     Verify that every automation script returns the right exit code - including when it fails.
 
 .DESCRIPTION
-    The success path of a script gets exercised constantly. The failure paths are the ones
-    that matter in CI and at 3am, and they are the ones nobody runs. This forces each of
-    them and asserts the exit code.
+    Success paths get exercised constantly. Failure paths matter in CI and at 3am, and
+    nobody runs them. This forces each one and asserts the exit code.
 
-    Failures are forced by pointing scripts at a SQL Server instance that does not exist
-    and at files that are missing or truncated. Nothing here modifies the real database.
+    Failures are forced with a nonexistent SQL instance and missing or truncated files.
+    Nothing here modifies the real database.
 
-    The exit-code contract under test:
-        0  success
-        1  the work failed
-        2  usage or configuration error (a prerequisite, not a data problem)
-        3  completed, but degraded
-
-    Why 2 is separate from 1: a CI job needs to distinguish "the data is bad" from "the
-    machine is not set up", because those need completely different responses.
+    Contract: 0 success, 1 the work failed, 2 usage or configuration error, 3 degraded.
+    2 is separate from 1 so a job can tell "the data is bad" from "the machine is not
+    set up".
 
 .PARAMETER SkipSlow
     Skip cases that touch the real database.

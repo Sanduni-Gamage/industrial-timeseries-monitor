@@ -1,20 +1,19 @@
 """Profile the raw MetroPT-3 CSV and emit a reproducible data-quality profile.
 
-This is a *read-only* investigation tool. It never modifies the source file and it
-never writes to the database. Its job is to replace every assumption in
-``docs/SQL_DESIGN.md`` with a measurement.
+Read-only: it never modifies the source file and never touches the database. Its job is to
+replace every assumption in docs/SQL_DESIGN.md with a measurement.
 
 Outputs
 -------
-- ``reports/data_profile.json``  machine-readable, consumed later by seeding/validation
-- ``docs/DATA_PROFILE.md``       human-readable narrative profile
+- reports/data_profile.json   machine-readable, consumed later by seeding/validation
+- docs/DATA_PROFILE.md        human-readable narrative profile
 
 Usage
 -----
     python scripts/profile_dataset.py [--csv PATH] [--out-json PATH] [--out-md PATH]
 
 Configuration precedence: CLI argument > environment variable > project default.
-Environment variables: ``METROPT_RAW_CSV``.
+Environment variables: METROPT_RAW_CSV.
 """
 
 from __future__ import annotations
@@ -399,16 +398,11 @@ def profile_failures(profile: Profile, frame: pd.DataFrame) -> None:
 
 
 def profile_frozen_blocks(profile: Profile, frame: pd.DataFrame, top_n: int = 10) -> None:
-    """Find windows where *every* analogue signal is simultaneously unchanging.
+    """Find windows where every analogue signal is simultaneously unchanging.
 
-    A single stuck sensor can be a faulty transmitter. **All seven** analogue signals
-    holding the exact same floating-point value at the same time cannot be physical:
-    oil temperature drifts, pressure ripples, motor current fluctuates. It is the
-    signature of a data-acquisition freeze - the logger repeating its last good scan.
-
-    This matters more than it looks. Cell-level null checks report this data as
-    perfectly complete, and range checks pass it happily because every held value is
-    plausible. Only a change-detection check finds it.
+    One stuck sensor is a faulty transmitter. All seven holding identical values at once
+    is not physical, it is the logger repeating its last good scan. Null and range checks
+    both pass this data; only change detection finds it.
     """
     analogue = frame[list(ANALOGUE_COLUMNS)].to_numpy()
     # True where this row is bit-identical to the previous row across all analogue signals.
@@ -546,7 +540,7 @@ def render_markdown(profile: Profile) -> str:
     add("")
     add(f"Columns: `{'`, `'.join(st['columns'])}`")
     add("")
-    add("The first column has an **empty header** in the source file - a pandas export "
+    add("The first column has an empty header in the source file, a pandas export "
         "artefact. It is read as `source_index` rather than allowing pandas to invent "
         "`Unnamed: 0`.")
     add("")
@@ -569,13 +563,13 @@ def render_markdown(profile: Profile) -> str:
     add(f"| Unique | {ts['is_unique']} |")
     add(f"| Duplicate timestamps | {ts['duplicate_timestamp_count']:,} |")
     add(f"| Backward steps | {ts['backward_step_count']:,} |")
-    add(f"| **Modal interval** | **{ts['modal_interval_seconds']} s** |")
+    add(f"| Modal interval | {ts['modal_interval_seconds']} s |")
     add(f"| Median interval | {ts['median_interval_seconds']} s |")
     add(f"| Mean interval | {round(ts['mean_interval_seconds'], 3)} s |")
     add(f"| Gap threshold used | {ts['gap_threshold_seconds']} s (3x modal) |")
     add(f"| Gaps detected | {ts['gap_count']:,} |")
     add(f"| Rows if continuous | {ts['expected_rows_if_continuous']:,} |")
-    add(f"| **Actual coverage** | **{ts['coverage_pct']}%** |")
+    add(f"| Actual coverage | {ts['coverage_pct']}% |")
     add(f"| Missing samples (est.) | {ts['missing_samples_estimate']:,} |")
     add("")
     add("### Interval distribution (top values)")
@@ -595,9 +589,9 @@ def render_markdown(profile: Profile) -> str:
         add("")
     add("## 4. Completeness and duplication")
     add("")
-    add(f"- Total null cells across all columns: **{comp['total_null_cells']:,}**")
-    add(f"- Fully duplicated rows (all columns): **{comp['duplicate_rows_all_columns']:,}**")
-    add(f"- Duplicated (timestamp + all signals): **{comp['duplicate_rows_timestamp_and_signals']:,}**")
+    add(f"- Total null cells across all columns: {comp['total_null_cells']:,}")
+    add(f"- Fully duplicated rows (all columns): {comp['duplicate_rows_all_columns']:,}")
+    add(f"- Duplicated (timestamp + all signals): {comp['duplicate_rows_timestamp_and_signals']:,}")
     add("")
     nonzero_nulls = {k: v for k, v in comp["null_counts"].items() if v}
     if nonzero_nulls:
@@ -606,9 +600,9 @@ def render_markdown(profile: Profile) -> str:
         for k, v in nonzero_nulls.items():
             add(f"| `{k}` | {v:,} |")
     else:
-        add("No null values in any column - consistent with the UCI declaration "
-            "(`has_missing_values: no`). Note that this refers to *cells*; missing "
-            "**time coverage** is a separate matter, quantified in section 3.")
+        add("No null values in any column, consistent with the UCI declaration "
+            "(`has_missing_values: no`). Note that this refers to cells. Missing time "
+            "coverage is a separate matter, quantified in section 3.")
     add("")
     add("## 5. Analogue sensors")
     add("")
@@ -627,19 +621,19 @@ def render_markdown(profile: Profile) -> str:
     for col in ANALOGUE_COLUMNS:
         c = p["columns"][col]
         lo, hi = c["iqr_lower_fence"], c["iqr_upper_fence"]
-        usable = "yes" if lo <= c["p01"] and hi >= c["p99"] else "**no - see below**"
+        usable = "yes" if lo <= c["p01"] and hi >= c["p99"] else "no - see below"
         add(f"| `{col}` | {c['p25']:.4g} | {c['p75']:.4g} | {lo:.4g} | {hi:.4g} | {usable} |")
     add("")
     add("Several of these fences are nonsense as alarm limits, and that is the point. "
         "`TP2` sits at roughly -0.01 bar for the ~55% of the time the compressor is "
-        "unloaded and rises above 8 bar when it runs, so its distribution is **bimodal**: "
+        "unloaded and rises above 8 bar when it runs, so its distribution is bimodal: "
         "the quartiles both land in the idle mode and the fences exclude every loaded "
         "sample. A global IQR rule would flag normal operation as anomalous and miss "
         "genuine faults. `Motor_current` shows the same problem from the other side - its "
         "lower fence is a negative current, which is meaningless.")
     add("")
-    add("**Consequence for the design:** baselines and anomaly thresholds are computed "
-        "*per operating state*, not globally. Operating state is derived from the "
+    add("The consequence for the design is that baselines and anomaly thresholds are "
+        "computed per operating state, not globally. Operating state is derived from the "
         "documented `Motor_current` bands and the `COMP` valve signal. This is recorded "
         "as a design decision in `docs/SQL_DESIGN.md`.")
     add("")
@@ -669,9 +663,9 @@ def render_markdown(profile: Profile) -> str:
     for k, v in cov["rows_per_month"].items():
         add(f"| {k} | {v:,} |")
     add("")
-    add(f"- Distinct calendar days present: **{cov['distinct_days']}**")
-    add(f"- Rows expected in a fully-covered day: **{cov['expected_rows_per_full_day']:,}**")
-    add(f"- Days with under 50% coverage: **{cov['days_below_50pct_coverage']}**")
+    add(f"- Distinct calendar days present: {cov['distinct_days']}")
+    add(f"- Rows expected in a fully-covered day: {cov['expected_rows_per_full_day']:,}")
+    add(f"- Days with under 50% coverage: {cov['days_below_50pct_coverage']}")
     add("")
     add("## 8. Documented failure windows")
     add("")
@@ -689,7 +683,7 @@ def render_markdown(profile: Profile) -> str:
         add(f"### `{name}`")
         add("")
         for k, v in check.items():
-            add(f"- **{k}**: {v}")
+            add(f"- {k}: {v}")
         add("")
 
     contam = p["cross_checks"].get("failure_window_contamination")
@@ -711,25 +705,25 @@ def render_markdown(profile: Profile) -> str:
     if frozen:
         add("## 10. Frozen archive blocks (stuck data acquisition)")
         add("")
-        add("Windows where **all seven analogue signals** are bit-identical to the "
-            "previous scan. Oil temperature drifts, pressure ripples and motor current "
-            "fluctuates in any real machine, so simultaneous freezing of all of them is "
-            "not physical - it is the logger repeating its last good scan.")
+        add("Windows where all seven analogue signals are bit-identical to the previous "
+            "scan. Oil temperature drifts, pressure ripples and motor current fluctuates "
+            "in any real machine, so simultaneous freezing of all of them is not physical. "
+            "It is the logger repeating its last good scan.")
         add("")
         add("This is invisible to the two checks people reach for first: the cells are "
             "not null, and every held value is inside its plausible range.")
         add("")
-        add(f"- Frozen samples: **{frozen['frozen_sample_count']:,}** "
-            f"(**{frozen['frozen_pct_of_file']}%** of the file)")
-        add(f"- Contiguous blocks found: **{frozen['block_count']}** (top {len(frozen['longest_blocks'])} shown)")
+        add(f"- Frozen samples: {frozen['frozen_sample_count']:,} "
+            f"({frozen['frozen_pct_of_file']}% of the file)")
+        add(f"- Contiguous blocks found: {frozen['block_count']} (top {len(frozen['longest_blocks'])} shown)")
         add("")
         add("| Start | End | Samples | Hours |")
         add("|---|---|---|---|")
         for b in frozen["longest_blocks"]:
             add(f"| {b['start']} | {b['end']} | {b['sample_count']:,} | {b['duration_hours']:,} |")
         add("")
-        add("**Handling.** These rows are ingested, not deleted, and marked with quality "
-            "code `UNCERTAIN_STALE`. Analytics excludes them from baseline statistics; the "
+        add("These rows are ingested, not deleted, and marked with quality code "
+            "`UNCERTAIN_STALE`. Analytics excludes them from baseline statistics, and the "
             "dashboard shows them as a distinct 'held data' band rather than as normal "
             "operation. See `docs/SQL_DESIGN.md` section 3.1.")
         add("")

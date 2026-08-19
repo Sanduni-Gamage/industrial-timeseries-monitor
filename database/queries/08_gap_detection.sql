@@ -1,24 +1,14 @@
 /* =====================================================================================
    Q8 - Missing-data / gap detection with LAG().
 
-   Purpose      Find intervals where the archive holds no data at all. This is the check
-                that separates "the machine was fine" from "we were not watching".
+   Separates "the machine was fine" from "we were not watching". One tag is enough,
+   because the logger writes all 15 signals in the same scan.
 
-   Technique    LAG() over ReadingTs for a single representative tag. One tag is enough:
-                the logger writes all 15 signals in the same scan, so a gap affects all
-                of them identically. Running this across every tag would multiply the
-                work by 15 to produce 15 copies of the same answer.
+   30 s = 3x the measured 10 s modal interval, which absorbs the +/-1-3 s of logger
+   jitter an exact-interval test would report as a million false gaps.
 
-   Threshold    30 s = 3x the measured 10 s modal interval. Not arbitrary: the interval
-                distribution shows 1,337,521 steps of 10 s but also 128,277 of 9 s and
-                38,321 of 12 s, roughly +/-1-3 s of logger jitter. An exact-interval
-                test would report a million false gaps.
-
-   Measured     331 gaps, largest 48.03 h, overall coverage 82.36%.
-
-   Production note: ops.vw_TimestampGap serves the same answer from the issues recorded
-   at ingestion time, which costs 331 rows instead of a 1.5-million-row scan. This query
-   is the derivation; the view is the cache.
+   Measured: 331 gaps, largest 48.03 h, coverage 82.36%. ops.vw_TimestampGap serves the
+   same answer from 331 recorded rows; this query is the derivation.
    ===================================================================================== */
 
 DECLARE @GapThresholdSeconds INT = 30;

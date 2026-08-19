@@ -86,15 +86,9 @@ def run_ingestion(
 ) -> IngestionResult:
     """Ingest the source file into SQL Server.
 
-    Parameters
-    ----------
-    limit_days:
-        Stop after this many days of readings. For fast iteration during development;
-        the run is recorded as ``PARTIAL`` so a truncated load can never be mistaken for
-        a complete one in the ledger.
-    force:
-        Re-process a file that a previous run already loaded successfully. The load is
-        idempotent either way - this only skips the shortcut, it does not duplicate rows.
+    ``limit_days`` stops early for fast iteration and records the run as PARTIAL, so a
+    truncated load cannot be mistaken for a complete one. ``force`` skips the
+    already-loaded shortcut; the load is idempotent either way.
     """
     started = time.perf_counter()
     path = csv_path or settings.metropt_raw_csv
@@ -318,14 +312,9 @@ def _coverage_issue(
 ) -> DataQualityIssue:
     """Record the load's own arithmetic, so the ledger is self-checking.
 
-    Every reading the source could produce must be accounted for exactly once. Rows the
-    pipeline deliberately refused - quarantined rows, and cells with no value - are
-    subtracted from the expectation rather than counted as losses, because they are
-    recorded elsewhere and can be audited. What is left over is unexplained, and
-    unexplained means the pipeline dropped something.
-
-    That distinction is the whole point. A reconciliation that reported a shortfall
-    every time a single row was quarantined would cry wolf, and nobody would read it.
+    Quarantined rows and valueless cells are subtracted from the expectation rather than
+    counted as losses, because they are recorded elsewhere. What is left over is
+    unexplained, and unexplained means something was dropped.
     """
     accepted_rows = rows_read - rejected
     expected = accepted_rows * sensor_count - missing

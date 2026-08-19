@@ -1,13 +1,9 @@
 /**
- * Overview - the screen that must answer "is this machine healthy, and what changed?"
- * without the reader knowing what a z-score is.
+ * Overview - answers "is this machine healthy, and what changed?" without the reader
+ * knowing what a z-score is.
  *
- * Everything here comes from a single `/summary` call. A dashboard that fires eight
- * requests to draw one screen is slower and harder to reason about than one endpoint
- * answering the question the screen actually asks.
- *
- * Ordering is deliberate: status first, then what is wrong, then what the machine is
- * doing, then how much the data can be trusted. An operator reads top-left first.
+ * Everything comes from a single /summary call. Ordering is deliberate: status, then
+ * what is wrong, then what the machine is doing, then how far the data can be trusted.
  */
 
 import { Link } from "react-router-dom";

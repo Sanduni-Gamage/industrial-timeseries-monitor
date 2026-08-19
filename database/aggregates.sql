@@ -1,17 +1,11 @@
 /* =====================================================================================
    Rebuild the aggregate archive: hourly and daily rollups.
-
-   This is the "aggregate archive" half of the pattern process historians use. The raw
-   archive (ts.SensorReading) keeps every scan; the aggregate archive keeps pre-computed
-   summaries so that a dashboard asking for six months of trend does not scan 22.7
-   million rows to draw a line 4,000 pixels wide.
-
-   Full rebuild rather than incremental. At this data volume it takes seconds, and a
-   rebuild cannot drift out of step with the raw archive the way an incremental update
-   can after a late-arriving backfill. Revisit if the raw archive grows an order of
-   magnitude.
-
-   Safe to re-run at any time.
+   
+   The aggregate half of the pattern historians use, so a six-month trend does not scan
+   22.7 million rows to draw a 4,000-pixel line.
+   
+   A full rebuild, because at this volume it takes seconds and cannot drift out of step
+   with the raw archive the way an incremental update can. Safe to re-run.
    ===================================================================================== */
 
 SET NOCOUNT ON;
@@ -19,19 +13,14 @@ GO
 
 /* -------------------------------------------------------------------------------------
    Hourly rollup
-
-   FirstValue and LastValue are resolved with CROSS APPLY rather than FIRST_VALUE /
-   LAST_VALUE window functions. The window form would sort all 22.7M rows, which on
-   Express (capped at ~1.4 GB buffer pool) spills to tempdb. The APPLY form does two
-   index seeks per bucket instead - roughly 76,000 buckets, ~150,000 seeks, each landing
-   directly on the clustered key. Measurably faster and it does not spill.
-
-   GoodCount is carried alongside SampleCount so the UI can show coverage. An hourly
-   average built from 12 samples is not the same number as one built from 360, and the
-   dashboard should be able to say so rather than drawing both as a confident line.
-
-   Value is CAST to FLOAT before averaging: summing tens of thousands of REAL values
-   accumulates visible error in 4-byte floating point.
+   
+   FirstValue/LastValue use CROSS APPLY rather than FIRST_VALUE/LAST_VALUE, which would
+   sort all 22.7M rows and spill to tempdb on Express. The APPLY form does two index seeks
+   per bucket instead.
+   
+   GoodCount travels with SampleCount so the UI can show coverage. Value is CAST to FLOAT
+   before averaging, because summing tens of thousands of REALs accumulates visible
+   error.
    ------------------------------------------------------------------------------------- */
 
 TRUNCATE TABLE analytics.SensorHourlyAgg;
@@ -132,13 +121,11 @@ GO
 
 /* -------------------------------------------------------------------------------------
    State-aware hourly rollup.
-
-   Held scans are excluded outright rather than averaged in: a frozen logger would
-   otherwise contribute a perfectly steady value that drags both the mean and the
-   standard deviation toward "this machine is very stable".
-
-   Analogue sensors only. An hourly mean of a 0/1 valve signal is a duty ratio, not a
-   measurement, and feeding it to a z-score detector produces confident nonsense.
+   
+   Held scans are excluded rather than averaged in, since a frozen logger contributes a
+   perfectly steady value that drags the mean and standard deviation toward "very stable".
+   Analogue sensors only: an hourly mean of a 0/1 valve is a duty ratio, not a
+   measurement.
    ------------------------------------------------------------------------------------- */
 
 TRUNCATE TABLE analytics.SensorHourlyStateAgg;
@@ -171,19 +158,14 @@ GO
 
 /* -------------------------------------------------------------------------------------
    Time-weighted hourly average.
-
-   A historian weights each reading by HOW LONG IT HELD, not by how many samples arrived.
-   The two differ whenever sampling is irregular - this archive has 9-13 s jitter and 331
-   gaps - and the simple mean is the one that is quietly wrong, because it over-weights
-   whatever the logger happened to sample densely.
-
-   Each reading's weight is the time until the next one, CLAMPED at the 30 s gap
-   threshold. Without the clamp the single reading before a 48-hour gap would carry 48
-   hours of weight and dominate its bucket entirely. Clamping is what a historian does
-   under a "maximum interval" setting; the alternative is a number that says more about
-   the outage than about the machine.
-
-   LEAST() requires SQL Server 2022 or later.
+   
+   A historian weights each reading by how long it held, not by how many arrived. With
+   9-13 s jitter and 331 gaps the simple mean over-weights whatever the logger sampled
+   densely.
+   
+   Each weight is the time to the next reading, clamped at the 30 s gap threshold, so the
+   reading before a 48-hour gap cannot carry 48 hours of weight. LEAST() requires SQL
+   Server 2022 or later.
    ------------------------------------------------------------------------------------- */
 
 WITH weighted AS (

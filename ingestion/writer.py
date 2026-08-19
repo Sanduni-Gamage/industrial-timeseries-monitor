@@ -1,15 +1,7 @@
-"""Writing to SQL Server: the run ledger, bulk loads, quality issues and quarantine.
+"""Bulk writes into staging, then a set-based merge into the fact table.
 
-Two things here are worth more than the code that implements them.
-
-**Idempotency.** Loading goes through a staging heap and then a set-based
-``INSERT ... WHERE NOT EXISTS`` against the ``(SensorId, ReadingTs)`` primary key. Running
-the same file twice inserts nothing the second time, and a run interrupted halfway can
-simply be re-run. Nothing about that depends on the caller remembering what happened.
-
-**Throughput.** ``fast_executemany`` turns ``executemany`` from one round trip per row
-into one parameter array per batch. Without it, 22.7 million single-row inserts over ODBC
-take hours rather than minutes.
+Row-by-row inserts of 22.7 M rows over ODBC would take hours. Chunks go to a staging table
+with fast_executemany, then INSERT ... WHERE NOT EXISTS makes the load idempotent.
 """
 
 from __future__ import annotations

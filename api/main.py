@@ -1,23 +1,8 @@
-"""FastAPI application for the industrial time-series monitoring platform.
+"""FastAPI application: 14 endpoints over the stored archive.
 
-Run it with:
-
-    python -m api                       # honours API_HOST / API_PORT from .env
-    uvicorn api.main:app --reload       # development
-
-Interactive documentation is generated from the route signatures and response models:
-``/docs`` (Swagger UI), ``/redoc``, and the raw schema at ``/openapi.json``.
-
-Design notes worth stating once:
-
-**Endpoints are synchronous ``def``, not ``async def``.** ``pyodbc`` is a blocking driver.
-FastAPI runs a sync endpoint in a worker thread, so a slow query delays one request
-instead of stalling the event loop for everyone. Declaring these ``async`` would be
-strictly worse while looking more modern.
-
-**No credentials reach the client.** Connection details live in configuration, database
-errors are logged with a reference and replaced with a stable message, and no endpoint
-echoes a connection string.
+Endpoints are sync def because pyodbc blocks, so FastAPI runs them on its threadpool
+rather than stalling the event loop. Errors are RFC 7807 problem+json. The repository
+seam lets the whole HTTP surface be tested without a database.
 """
 
 from __future__ import annotations
@@ -44,11 +29,11 @@ DESCRIPTION = """
 REST API over a historical archive of condition-monitoring data from a metro train's
 compressor Air Production Unit (UCI MetroPT-3, DOI 10.24432/C5VW3R).
 
-**What the data is.** 22,754,220 readings - 1,516,948 scans of 15 sensors, February to
+What the data is. 22,754,220 readings - 1,516,948 scans of 15 sensors, February to
 September 2020. Coverage is 82.4%: the remaining 17.6% of the timeline has no data, in
 331 recorded gaps.
 
-**Three things this API will not do to you.**
+Three things this API will not do to you.
 
 * *Silently truncate.* Any series that hits a result cap is returned with
   `truncated: true`.
@@ -58,7 +43,7 @@ September 2020. Coverage is 82.4%: the remaining 17.6% of the timeline has no da
 * *Return an unusable number of points.* `resolution=auto` picks raw, hourly or daily
   from the width of the window.
 
-**Thresholds are data, not code.** Every severity boundary traces to a row in
+Thresholds are data, not code. Every severity boundary traces to a row in
 `analytics.SensorBaseline` or to a setpoint published by the equipment owner.
 """
 

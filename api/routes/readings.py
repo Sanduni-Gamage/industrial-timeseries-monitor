@@ -112,7 +112,7 @@ def get_trend(
 ) -> TrendSeries:
     """Hourly series with a rolling mean, rolling spread and rate of change.
 
-    Rate of change is per hour of **elapsed** time rather than per bucket, because 17.6%
+    Rate of change is per hour of elapsed time rather than per bucket, because 17.6%
     of the archive is missing: treating a 48-hour gap as one step would report a violent
     swing where there was simply no data.
     """

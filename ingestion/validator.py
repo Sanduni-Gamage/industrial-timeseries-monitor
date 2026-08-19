@@ -1,29 +1,11 @@
 """Validation and quality coding.
 
-Nothing here deletes data. Every check either assigns a quality code to a reading, or
-records an issue, or moves a row that cannot be stored at all into the quarantine list.
-The result is that "we did not silently drop anything" is a property the database can
-prove, not a claim in a README.
+Nothing here deletes data. Every check assigns a quality code, records an issue, or moves
+an unstorable row to quarantine, so "nothing was silently dropped" is a property the
+database can prove.
 
-The checks, and where their thresholds come from:
-
-============================ ==================================================
-Check                        Basis
-============================ ==================================================
-Unparseable timestamp        Cannot be keyed; quarantined
-Duplicate / backward time    Violates the (SensorId, ReadingTs) primary key
-Gap                          3x the measured 10 s modal interval (config)
-Missing value                Cannot be stored NOT NULL; counted and skipped
-Out of range                 asset.Sensor.PhysicalMin / PhysicalMax
-Non-binary digital           Digital tags must be 0 or 1
-Flatline                     >= N identical consecutive scans (config)
-Cross-sensor divergence      |Reservoirs - TP3|, documented to stay close
-============================ ==================================================
-
-The flatline check is the one that matters most on this dataset. It found 24 blocks
-totalling 3.35% of the file, including a 51-hour stretch, none of which is visible to a
-null check or a range check - every held value is plausible and no cell is empty.
-See docs/DATA_PROFILE.md §10.
+The flatline check matters most on this dataset: 24 blocks, 3.35% of the file, invisible
+to both null and range checks. See docs/DATA_PROFILE.md section 10.
 """
 
 from __future__ import annotations
@@ -337,12 +319,9 @@ def _check_timestamp_order(
 ) -> tuple[pd.DataFrame, list[RejectedRow]]:
     """Detect gaps, duplicates and backward steps; quarantine what cannot be stored.
 
-    Gaps are recorded and kept - an absent interval is information, not an error, and
-    17.6% of this archive is absent. Duplicate and backward timestamps are quarantined,
-    because they would collide on the ``(SensorId, ReadingTs)`` primary key.
-
-    ``offset`` skips rows carried over from the previous chunk. They have already been
-    checked, and re-checking them would count the same gap twice.
+    Gaps are recorded and kept, since an absent interval is information. Duplicates and
+    backward steps are quarantined, because they collide on the primary key. ``offset``
+    skips rows carried over from the previous chunk so a gap is not counted twice.
     """
     timestamps = frame[TIMESTAMP_COLUMN]
     previous = timestamps.shift(1)
@@ -502,13 +481,10 @@ def _check_cross_sensor(
 ) -> None:
     """Check the one physical invariant the source documentation gives us.
 
-    The dataset states that ``Reservoirs`` "should be close to" ``TP3``. That makes a
-    divergence threshold a documented physical relationship rather than a chosen number.
-    Measured divergence never exceeds 0.182 bar, so the 0.5 bar default flags instrument
-    failure, not noise.
-
-    Recorded as an issue only. It is a relationship between two tags, so blaming one of
-    them with a quality code would be guesswork about which sensor drifted.
+    The dataset states Reservoirs "should be close to" TP3, so the threshold is
+    documented rather than chosen. Measured divergence never exceeds 0.182 bar, so the
+    0.5 bar default flags instrument failure. Recorded as an issue only, because blaming
+    one of two tags would be guesswork.
     """
     left, right = CROSS_CHECK_PAIR
     available = {sensor.source_column for sensor in sensors}

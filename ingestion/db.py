@@ -41,14 +41,8 @@ def connect(
 ) -> Iterator[pyodbc.Connection]:
     """Yield a pyodbc connection, committing on success and rolling back on failure.
 
-    Parameters
-    ----------
-    database:
-        Override the configured database. Pass ``'master'`` for operations that must
-        run before the application database exists, such as ``CREATE DATABASE``.
-    autocommit:
-        Required for statements SQL Server refuses to run inside an explicit
-        transaction (``CREATE DATABASE``, ``ALTER DATABASE``).
+    Pass ``database='master'`` for work that precedes the application database, and
+    ``autocommit`` for statements SQL Server refuses inside an explicit transaction.
     """
     cfg = settings or get_settings()
     try:

@@ -1,12 +1,12 @@
 /**
  * Data-fetching hook.
  *
- * Deliberately small and dependency-free rather than pulling in a query library: the
- * dashboard has one data source, no mutations and no cache invalidation to reason about.
+ * Small and dependency-free rather than a query library: one data source, no mutations,
+ * no cache invalidation.
  *
- * Every fetch returns the four states a panel must be able to render - loading, error,
- * empty, and loaded. Panels that only handle "loaded" are how a dashboard ends up
- * showing a blank rectangle when the service is down.
+ * Every fetch returns the four states a panel must render - loading, error, empty,
+ * loaded. Panels that only handle "loaded" are how a dashboard shows a blank rectangle
+ * when the service is down.
  */
 
 import { useCallback, useEffect, useRef, useState } from "react";

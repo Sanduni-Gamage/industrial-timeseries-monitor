@@ -1,8 +1,7 @@
 """Export the OpenAPI schema to a file.
 
-The dashboard's TypeScript types are generated from this file rather than from a running
-server, so type generation works offline, in CI, and without a database. The spec is
-produced from the FastAPI app object itself, so it cannot drift from the code.
+Produced from the FastAPI app object, so it cannot drift from the code, and written to
+disk so type generation works offline and without a database.
 
 Usage
 -----

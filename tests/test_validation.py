@@ -1,6 +1,6 @@
 """Validation and quality-coding tests.
 
-Priority here is the **unhappy paths**. The MetroPT-3 file is clean - zero nulls, zero
+Priority here is the unhappy paths. The MetroPT-3 file is clean - zero nulls, zero
 duplicate timestamps, zero out-of-range values - so the quarantine and rejection code in
 `ingestion/validator.py` never executed once during the real load. Code that only runs
 when something goes wrong is exactly the code that is broken when something goes wrong,
@@ -258,16 +258,11 @@ def test_flatline_spanning_a_chunk_boundary_is_measured_whole(chunks, sensors, s
     """The trickiest logic in the pipeline, and the reason it exists.
 
     A freeze straddling a chunk boundary must not be cut into two shorter runs that each
-    fall under the threshold and go unreported. Rows inside an unfinished freeze are held
-    back and prepended to the next chunk.
+    fall under the threshold. Here 4 frozen scans end chunk one and 4 begin chunk two;
+    neither half reaches the six-sample threshold alone.
 
-    Here: 4 frozen scans end chunk one, 4 more begin chunk two - 8 identical scans in
-    total. Neither half reaches the six-sample threshold alone, so without the hold-back
-    the freeze would go completely unreported.
-
-    Counting note, which is easy to get wrong: a freeze of N identical scans produces
-    **N-1** flagged rows, because the first scan of the run is the last genuine reading
-    and is left GOOD. Eight frozen scans therefore mean seven UNCERTAIN_STALE rows.
+    N identical scans produce N-1 flagged rows: the first is the last genuine reading and
+    stays GOOD.
     """
     state = ValidationState()
     issues = IssueAccumulator()
@@ -413,18 +408,10 @@ def test_infinite_values_are_caught_as_out_of_range(chunks, sensors, settings, v
 def test_dst_repeated_local_time_is_quarantined_not_merged(chunks, sensors, settings):
     """A documented limitation of a timezone-less source, pinned by a test.
 
-    The source declares no timezone, so timestamps are parsed as naive local time. During
-    a daylight-saving fall-back the same local clock time occurs twice - 02:30 happens
-    once in summer time and again an hour later in winter time - and in a naive archive
-    those two distinct instants are indistinguishable.
-
-    The pipeline does the only defensible thing: the second occurrence collides on the
-    (SensorId, ReadingTs) primary key and is quarantined verbatim rather than silently
-    overwriting the first. Nothing is invented, and the ambiguity is visible in
-    ops.RejectedRow instead of hidden.
-
-    The alternative - inventing a timezone in order to disambiguate - would fabricate
-    information the source does not contain.
+    During a daylight-saving fall-back the same local clock time occurs twice, and a naive
+    archive cannot tell the two instants apart. The second occurrence collides on the
+    primary key and is quarantined verbatim rather than overwriting the first. Inventing a
+    timezone to disambiguate would fabricate information the source does not contain.
     """
     chunk = chunks.build([
         "2020-10-25 01:59:50",

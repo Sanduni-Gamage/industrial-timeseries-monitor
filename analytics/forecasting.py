@@ -1,23 +1,8 @@
-"""Short-horizon forecasting baselines.
+"""Short-horizon forecasting for trend context, not for prediction.
 
-The brief calls this optional and says the purpose is to demonstrate time-series
-understanding, not to build something complex. The honest demonstration here is mostly a
-negative one, and that is the useful part.
-
-Three methods, evaluated on a held-out tail:
-
-1. **Naive (persistence)** - tomorrow equals today. The benchmark any forecast must beat
-   to have earned its complexity.
-2. **Moving average** - the mean of the last *k* days.
-3. **Holt-Winters exponential smoothing** - level plus trend, optionally seasonal.
-
-The target is the *daily mean of a sensor within one operating state*. Forecasting the
-state-blind daily mean would mostly be forecasting the duty cycle, which is driven by
-train demand this dataset does not contain - an unforecastable quantity dressed up as a
-sensor prediction.
-
-Whether any of this beats persistence is reported as measured, including when it does
-not.
+Naive, moving-average and Holt-Winters baselines over hourly aggregates. Included to give
+the dashboard an expected range to draw against; no claim is made that these predict
+failures, and no accuracy figure is quoted.
 """
 
 from __future__ import annotations
@@ -106,7 +91,7 @@ def evaluate(
 ) -> list[ForecastResult]:
     """Compare the three methods on a held-out tail, one day ahead each time.
 
-    Evaluation is **walk-forward**: at each holdout day the model may use everything
+    Evaluation is walk-forward: at each holdout day the model may use everything
     before it and nothing after. A single fit on the whole series, scored on part of it,
     would leak the answer into the forecast and report an accuracy nobody could achieve
     in operation.

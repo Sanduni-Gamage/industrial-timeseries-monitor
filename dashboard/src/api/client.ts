@@ -1,14 +1,12 @@
 /**
  * Typed API client.
  *
- * Response types come from `schema.d.ts`, which is generated from the FastAPI
- * application's own OpenAPI document (`npm run gen:types`). That is what keeps the
- * contract honest: if a Python response model changes and the dashboard is not updated,
- * the TypeScript build fails rather than the UI quietly rendering `undefined`.
+ * Response types come from schema.d.ts, generated from the FastAPI app's own OpenAPI
+ * document. If a Python model changes without regeneration, the build fails rather than
+ * the UI rendering undefined.
  *
- * Errors are RFC 7807 problem documents. They are surfaced as a typed `ApiError` so the
- * UI can show the server's own explanation - which is written for an operator - instead
- * of a generic "something went wrong".
+ * Errors are RFC 7807 problem documents, surfaced as a typed ApiError so the UI can show
+ * the server's own operator-facing explanation.
  */
 
 import type { components } from "./schema";

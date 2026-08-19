@@ -1,19 +1,9 @@
 /* =====================================================================================
    Q4 - Anomaly retrieval, ranked, with the metadata needed to act on it.
 
-   Purpose      Feeds the dashboard's anomaly table. An operator needs the value, what
-                was expected, how far outside it fell, and which rule said so - a bare
-                "anomaly" row is not actionable.
-
-   Access path  IX_Anomaly_Ts_Severity (ReadingTs DESC, Severity) INCLUDE(...) is
-                covering for this query, so it never touches the base table.
-
-   Note         Method is part of the anomaly table's unique key on purpose. The same
-                instant can legitimately be flagged by the rolling z-score and by the IQR
-                rule, and collapsing them would hide which rule is actually firing.
-
-   Returns nothing until Phase 3 populates analytics.Anomaly. That is correct: with no
-   computed baseline there is no defensible notion of "abnormal".
+   IX_Anomaly_Ts_Severity is covering here, so the base table is never touched. Method
+   is part of the unique key on purpose: the same instant can be flagged by two rules,
+   and collapsing them would hide which one is firing.
    ===================================================================================== */
 
 DECLARE @From DATETIME2(3) = '2020-06-01T00:00:00';

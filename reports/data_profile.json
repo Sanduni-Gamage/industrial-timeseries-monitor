@@ -1,5 +1,5 @@
 {
-  "generated_utc": "2026-09-07T15:12:19+00:00",
+  "generated_utc": "2026-09-09T03:01:20+00:00",
   "source": {
     "file_name": "MetroPT3(AirCompressor).csv",
     "size_bytes": 218300507,
@@ -817,7 +817,7 @@
       ]
     },
     "frozen_archive_blocks": {
-      "rationale": "All 7 analogue signals bit-identical to the previous scan \u2014 physically impossible, indicates last-value-hold in the logger.",
+      "rationale": "All 7 analogue signals bit-identical to the previous scan - physically impossible, indicates last-value-hold in the logger.",
       "frozen_sample_count": 50870,
       "frozen_pct_of_file": 3.353,
       "block_count": 24,

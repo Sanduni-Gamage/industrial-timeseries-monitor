@@ -3,16 +3,11 @@
     Check that the monitoring platform is working.
 
 .DESCRIPTION
-    Verifies, in order:
-      1. SQL Server is reachable
-      2. the schema is present and populated
-      3. data has been ingested, and how recently
-      4. the analytics layer has produced baselines and detections
-      5. the REST API is answering
+    Verifies in order: SQL Server reachable, schema present, data ingested, analytics
+    populated, REST API answering.
 
-    Written to be run unattended. It distinguishes **down** from **degraded**, because
-    those need different responses: a database that cannot be reached is an outage, while
-    an API that is not running when nobody asked it to be is not.
+    Written for unattended use, and it distinguishes down from degraded. An unreachable
+    database is an outage; an API nobody asked to be running is not.
 
 .PARAMETER SkipApi
     Do not check the REST API. Useful on a machine that only runs ingestion.

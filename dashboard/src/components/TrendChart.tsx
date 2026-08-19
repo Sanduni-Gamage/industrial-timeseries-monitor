@@ -1,22 +1,12 @@
 /**
  * Time-series chart.
  *
- * Chart decisions, and why:
+ * One y-axis, always: a second scale makes the alignment arbitrary and invents a
+ * correlation the data does not contain. Two series maximum, from fixed palette slots,
+ * so colour follows the entity rather than its position in a list.
  *
- * - **One y-axis, always.** Never a second scale for a second measure. Two scales make
- *   their alignment arbitrary, which invents a correlation the data does not contain.
- *   Reading and rolling average share a scale because they share a unit; anything else
- *   gets its own chart.
- * - **Two series maximum, from fixed palette slots.** Colour follows the entity, not its
- *   position in a list, so toggling a series never repaints the other one.
- * - **A legend whenever more than one series is drawn**, so identity is never carried by
- *   colour alone.
- * - **Solid hairline gridlines.** Dashed gridlines read as "threshold" or "projection"
- *   when they are just a grid.
- * - **Crosshair and tooltip by default.** An HTML chart is interactive; the axis cannot
- *   carry per-point values, and labelling every point is unreadable.
- * - **Reference lines are labelled.** A documented setpoint drawn without a label is
- *   just a mysterious line.
+ * A legend whenever more than one series is drawn, solid hairline gridlines (dashed
+ * reads as "threshold"), crosshair and tooltip by default, and reference lines labelled.
  */
 
 import {
@@ -151,16 +141,12 @@ export function TrendChart({
             tickLine={false}
             minTickGap={48}
           />
-          {/* The y-axis fits the data rather than starting at zero.
+          {/* The y-axis fits the data rather than starting at zero. Truncating a bar
+           * axis is a lie, since bar length encodes magnitude, but on a line chart of a
+           * continuous quantity it is correct: pressure between 8.5 and 9.7 bar plotted
+           * from zero flattens exactly the variation the operator wants.
            *
-           * On a BAR chart a truncated axis is a lie: bar length encodes magnitude, so
-           * cutting the baseline exaggerates differences. On a LINE chart of a continuous
-           * physical quantity it is the correct default - pressure sitting between 8.5
-           * and 9.7 bar plotted from zero wastes three quarters of the plot and flattens
-           * exactly the variation the operator is looking for. Temperature and pressure
-           * charts have worked this way in process monitoring forever.
-           *
-           * Padded by 8% of the observed range so the line never touches the frame. */}
+           * Padded by 8% so the line never touches the frame. */}
           <YAxis
             stroke={axis}
             tick={{ fill: ink, fontSize: 11 }}

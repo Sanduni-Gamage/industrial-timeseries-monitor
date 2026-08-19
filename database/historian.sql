@@ -1,12 +1,10 @@
 /* =====================================================================================
    Historian retrieval semantics.
-
+   
    Two things a historian does that a plain table does not, implemented against the
-   COMPRESSED archive - because that is the archive a historian would actually hold.
-
-     1. Interpolated retrieval at an arbitrary instant
-     2. A summary of what compression cost and what it bought
-
+   compressed archive, because that is the archive a historian would actually hold:
+   interpolated retrieval at an arbitrary instant, and a summary of what compression cost.
+   
    Safe to re-run.
    ===================================================================================== */
 
@@ -15,25 +13,17 @@ GO
 
 /* -------------------------------------------------------------------------------------
    analytics.fn_ValueAt - the value of a tag at any instant, stored or not.
-
-   This is the retrieval primitive a historian is built around. You do not ask "give me
-   the rows between A and B"; you ask "what was this tag reading at 14:07:33", and the
-   system answers from the two archived points that bracket it.
-
-   An inline table-valued function, not a scalar UDF: SQL Server can fold a TVF into the
-   calling query's plan, whereas a scalar UDF is invoked once per row and kills
-   parallelism.
-
-   Three behaviours worth stating:
-
-   * **Linear between bracketing points.** This is exactly the reconstruction the
-     compression error bound was verified against, so any value returned here is
-     guaranteed within the configured deviation of what was originally measured.
-   * **Nothing is returned across a gap.** If the bracketing points are further apart than
-     the gap threshold, the function returns no row. Drawing a line across a 48-hour hole
-     would invent a measurement, and every other part of this project refuses to do that.
-   * **Digital tags step, they do not ramp.** A valve is open or shut; interpolating it to
-     0.63 is meaningless, so the previous value is held instead.
+   
+   The retrieval primitive a historian is built around: not "give me the rows between A
+   and B", but "what was this tag reading at 14:07:33", answered from the two archived
+   points that bracket it.
+   
+   An inline TVF, not a scalar UDF, so SQL Server folds it into the calling plan instead
+   of invoking it once per row.
+   
+   Three behaviours: linear between bracketing points, which is the reconstruction the
+   error bound was verified against; no row at all across a gap, because a line there
+   would invent a measurement; and digital tags step rather than ramp.
    ------------------------------------------------------------------------------------- */
 
 CREATE OR ALTER FUNCTION analytics.fn_ValueAt
@@ -126,10 +116,9 @@ GO
 
 /* -------------------------------------------------------------------------------------
    analytics.vw_AggregateComparison - simple vs time-weighted mean, side by side.
-
-   Kept as a view rather than a one-off query because the difference is the argument for
-   time-weighting existing at all, and it should be checkable at any time rather than
-   quoted from a write-up.
+   
+   A view rather than a one-off query, because the difference is the argument for
+   time-weighting existing at all and should be checkable at any time.
    ------------------------------------------------------------------------------------- */
 
 CREATE OR ALTER VIEW analytics.vw_AggregateComparison

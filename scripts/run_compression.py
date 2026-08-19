@@ -1,22 +1,12 @@
 """Compress the archive with swinging-door trending and measure what it costs.
 
-Produces the number that separates a historian from a table with timestamps in it: how
-much of the raw archive can be discarded while guaranteeing every discarded reading is
-within a stated tolerance of what you get back.
-
-Two modes:
-
-    --sweep     characterise the trade-off across several deviations and write nothing
-    (default)   compress at the configured deviation and store the result
-
 The error bound is verified on every run by reconstructing the full series from the
-retained points. A violation is a bug in this code, not a property of the data, and the
-script exits non-zero if one occurs.
+retained points. A violation is a bug here, not a property of the data.
 
 Usage
 -----
-    python scripts/run_compression.py --sweep
-    python scripts/run_compression.py --deviation-pct 0.1
+    python scripts/run_compression.py --sweep              # trade-off curve, writes nothing
+    python scripts/run_compression.py --deviation-pct 0.1  # compress at one deviation
     python scripts/run_compression.py --sensor TP3 --sweep
 
 Exit codes: 0 success · 1 failure · 2 nothing to compress · 3 an error bound was violated

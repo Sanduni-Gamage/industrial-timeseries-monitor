@@ -1,13 +1,7 @@
-"""Typed configuration for the ingestion pipeline.
+"""Settings loaded from the environment.
 
-Everything the pipeline needs to know about its environment lives here, loaded from
-environment variables (or a ``.env`` file) and validated by Pydantic. No module in this
-project reads ``os.environ`` directly and no module hard-codes a path or a credential.
-
-The data-quality thresholds are deliberately configuration rather than constants: each
-one was derived from a measurement in ``docs/DATA_PROFILE.md``, and a different machine
-or a different export would need different values. The docstrings record where each
-number came from so nobody has to guess later.
+No paths, connection strings or credentials in source. Passwords are SecretStr so they
+cannot be logged by accident.
 """
 
 from __future__ import annotations
@@ -136,8 +130,8 @@ class Settings(BaseSettings):
         """Build an ODBC connection string.
 
         Pass ``database='master'`` to connect before the application database exists.
-        The password is only materialised here, at the point of use, and is never
-        logged: ``__repr__`` on ``SecretStr`` prints ``**********``.
+        The password is materialised only here, at the point of use. SecretStr's repr
+        masks it, so it is never logged.
         """
         parts = [
             f"DRIVER={{{self.db_driver}}}",

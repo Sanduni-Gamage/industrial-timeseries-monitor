@@ -3,20 +3,12 @@
     Run data-quality validation and produce the quality report.
 
 .DESCRIPTION
-    Checks the stored archive rather than the source file: validation happened during
-    ingestion, and this reports what it found and whether the result is acceptable.
+    Checks the stored archive rather than the source file, since validation happened
+    during ingestion.
 
-    The checks, and why each one exists:
-
-      * **Reconciliation** - source rows x sensors must equal what was stored, minus
-        anything quarantined or missing. A mismatch means the pipeline lost data, which
-        is a different and more serious problem than the data being flawed.
-      * **Held (frozen) readings** - the finding no null check or range check can make.
-        Values from a logger repeating its last scan are non-null and inside range.
-      * **Quarantine** - rows the pipeline refused, kept verbatim.
-      * **Referential integrity** - every reading maps to a real sensor and a real
-        quality code.
-      * **Coverage** - how much of the timeline actually has data.
+    Five checks: reconciliation (a mismatch means the pipeline lost data, which is worse
+    than the data being flawed), held readings (invisible to null and range checks),
+    quarantine, referential integrity, and timeline coverage.
 
 .PARAMETER FailOnWarnings
     Treat warnings as failures. For a CI gate that should not accept a degraded archive.

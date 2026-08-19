@@ -1,22 +1,12 @@
 /* =====================================================================================
    Q7 - Daily statistics including a true median.
 
-   Purpose      Mean and median disagree sharply on this machine, and the disagreement
-                is the finding. The compressor is unloaded 54.65% of the time, so a
-                pressure signal like TP2 has a median near its idle value (-0.012 bar)
-                and a mean pulled upward by the loaded periods (1.368 bar overall).
+   Mean and median disagree sharply here, and that is the finding: the compressor is
+   unloaded 54.65% of the time, so TP2's median sits near idle (-0.012 bar) while its
+   mean is pulled to 1.368 bar by the loaded periods. An operator needs both.
 
-                Reporting only the mean hides the duty cycle; reporting only the median
-                hides the load. An operator needs both, which is why the dashboard shows
-                a band rather than a single line.
-
-   Technique    PERCENTILE_CONT is a window function, not an aggregate - it returns a
-                value per row, so it needs DISTINCT (or a windowed CTE) to collapse to
-                one row per group. That surprises people; it is called out here on
-                purpose.
-
-   Cost         This one scans raw readings for the chosen window, because a median
-                cannot be derived from stored min/max/avg. Keep the window bounded.
+   PERCENTILE_CONT is a window function, not an aggregate, so it needs DISTINCT to
+   collapse to one row per group. This scans raw readings, so keep the window bounded.
    ===================================================================================== */
 
 DECLARE @SensorCode VARCHAR(32) = 'TP2';

@@ -1,7 +1,7 @@
 """Reshape validated wide rows into the narrow tag/value form the database stores.
 
 One source row carrying 15 signals becomes 15 reading rows. The output is emitted in
-**tag-major** order - every reading for sensor 1, then every reading for sensor 2 - which
+tag-major order - every reading for sensor 1, then every reading for sensor 2 - which
 matches the ``(SensorId, ReadingTs)`` clustered key exactly. Rows therefore arrive at the
 index in physical order and append to the end of each key range instead of scattering
 inserts across it.

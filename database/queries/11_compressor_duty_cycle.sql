@@ -1,23 +1,14 @@
 /* =====================================================================================
    Q11 - Compressor duty cycle derived from documented operating states.
 
-   Purpose      Turn raw current readings into the thing an operations engineer actually
-                cares about: how hard is this machine working, and is that changing?
+   The band edges are midpoints between the four nominal currents the UCI documentation
+   states outright (0 / 4 / 7 / 9 A), so they are traceable rather than tuned.
 
-   Why it is defensible: the band edges are not clustered, tuned or guessed. The UCI
-   documentation states the nominal current for each state outright - "values close to
-   0A when it turns off, 4A when working offloaded, 7A when working under load, and 9A
-   when it starts working". The boundaries below are the midpoints between those
-   documented values.
+   Measured: OFF 54.65%, OFFLOADED 30.15%, LOADED 15.20%, STARTING 0.003% (44 scans).
 
-   Measured over the whole archive: OFF 54.65%, OFFLOADED 30.15%, LOADED 15.20%,
-   STARTING 0.003% (44 scans).
-
-   This state is also what makes anomaly detection work on this machine. Global
-   thresholds are meaningless on a bimodal duty-cycled signal - the IQR fences for TP2
-   computed over everything are -0.020..-0.004 bar against a real range of
-   -0.032..10.68 bar. Baselines are computed per state instead. See docs/SQL_DESIGN.md
-   section 6.6.
+   State is also what makes anomaly detection work here: global IQR fences for TP2 come
+   out at -0.020..-0.004 bar against a real range of -0.032..10.68. See
+   docs/SQL_DESIGN.md section 6.6.
    ===================================================================================== */
 
 DECLARE @From DATETIME2(3) = '2020-06-01T00:00:00';
