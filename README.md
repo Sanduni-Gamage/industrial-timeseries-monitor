@@ -183,25 +183,48 @@ has that this does not, is [`docs/HISTORIAN_CONCEPTS.md`](docs/HISTORIAN_CONCEPT
 
 ## Screenshots
 
-Placeholders, to be replaced with images. Both servers must be running (see
-[Running locally](#running-locally)), then capture at 1280 px wide in dark theme and save
-as PNG to `docs/screenshots/`.
+The dashboard and the generated report, captured from a live run against the full
+22.7-million-reading archive.
 
-| File to add | Page | What it should show |
-|---|---|---|
-| `docs/screenshots/overview.png` | `http://localhost:5173/` | Equipment status with its written reason, stat tiles, "What needs attention" table, data-quality bars |
-| `docs/screenshots/sensor-explorer.png` | `/sensors?sensor=TP3` | Sensor and machine-state selectors, 7-day preset active, the readings chart |
-| `docs/screenshots/anomalies.png` | `/anomalies` | Paginated table with plain-English machine states and the expected-range column |
-| `docs/screenshots/data-quality.png` | `/quality` | The "complete is not the same as correct" panel and the disposition table |
-| `docs/screenshots/quality-report.png` | `reports/data_quality_report.html` | The generated HTML report |
-| `docs/screenshots/swagger.png` | `http://localhost:8000/docs` | The 14 endpoints grouped by tag |
+### Overview
 
-<!--
+Equipment status with the reason written out, the four stat tiles, what needs attention,
+and how far the data can be trusted.
+
 ![Overview](docs/screenshots/overview.png)
+
+### Sensor explorer
+
+TP3 over seven days. Three sharp pressure drops, the rolling average drawn against the
+hourly values, and the machine-state filter that makes a trend comparable.
+
 ![Sensor explorer](docs/screenshots/sensor-explorer.png)
+
+### Anomalies
+
+15,196 flagged readings, paginated. Every row shows what was measured, what was expected,
+how far outside it fell, and which rule fired.
+
 ![Anomalies](docs/screenshots/anomalies.png)
+
+### Data quality
+
+The screen that leads with what a completeness check would miss.
+
 ![Data quality](docs/screenshots/data-quality.png)
--->
+
+### Generated quality report
+
+`scripts/generate-report.ps1` output, every figure queried at generation time.
+
+![Quality report](docs/screenshots/quality-report.png)
+
+### API
+
+The 14 endpoints, grouped by tag, from the OpenAPI document the dashboard's TypeScript
+types are generated from.
+
+![Swagger UI](docs/screenshots/swagger.png)
 
 ---
 
