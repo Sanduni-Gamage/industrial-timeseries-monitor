@@ -46,10 +46,6 @@ reports/*.html
 reports/figures/*
 !reports/.gitkeep
 
-# Screenshots are committed; the folder's guide must survive an empty checkout.
-!docs/screenshots/
-!docs/screenshots/*.png
-!docs/screenshots/README.md
 
 # --- Editors / OS ---
 .vs/
@@ -60,4 +56,4 @@ reports/figures/*
 Thumbs.db
 desktop.ini
 .claude/
-docs/
+
