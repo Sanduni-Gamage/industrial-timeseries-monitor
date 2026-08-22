@@ -475,39 +475,6 @@ wrong.
 
 ---
 
-## Limitations
-
-Stated plainly, because a portfolio project that overstates itself is worse than one that
-does less.
-
-- This is not a process historian. No PI System, no IP.21, no Wonderware. It implements
-  historian mechanisms on a general-purpose RDBMS, including tag modelling, OPC-style
-  quality codes, a raw archive alongside an aggregate archive, swinging-door compression,
-  interpolated retrieval and time-weighted aggregation, and measures each one. What it
-  does not have is an asset framework, store-and-forward collectors, native OPC
-  connectivity, retention tiering or high availability.
-  [`docs/HISTORIAN_CONCEPTS.md`](docs/HISTORIAN_CONCEPTS.md) is the itemised scorecard,
-  including everything in the "not" list.
-- No live connection to anything. The data is a fixed 2020 archive. There is no OPC UA
-  client, no MQTT subscriber, no streaming ingest. Time ranges anchor to the end of the
-  archive rather than to the wall clock, because otherwise every default view is empty.
-- One machine, one failure mode, four events, three of them usable. Nothing here
-  generalises to other equipment or other faults, and no accuracy figure computed from
-  three positives would mean anything. None is quoted.
-- No operating context. No train schedule, ambient temperature or demand data, so a rise
-  in duty cycle cannot be separated from a busier week.
-- The reference baseline is atypical. February is at roughly the 12th percentile of
-  machine activity. It is kept because it is the only substantial failure-free window, and
-  the limitation is recorded rather than papered over.
-- Association, not causation. The 11.5× enrichment says alarms and failures co-occur. It
-  does not establish that those alarms would have been actionable in advance.
-- Single-node, single-user. No authentication, no role-based access, no high availability,
-  no retention policy enforcement.
-- CI has not run on GitHub. The workflow's five jobs were each executed locally before
-  being committed, but no remote exists yet, so no badge is claimed.
-
----
-
 ## Future improvements
 
 - Connect a live source over OPC UA or MQTT, with the existing validation applied to the
@@ -539,10 +506,6 @@ does less.
 | [`docs/DEV_LOG.md`](docs/DEV_LOG.md) | 46 entries, every real error hit while building this, with root cause and fix |
 | [`docs/IMPLEMENTATION_PLAN.md`](docs/IMPLEMENTATION_PLAN.md) | The nine phases and their measured exit criteria |
 
-`docs/DEV_LOG.md` is the one worth reading. It records what actually broke: a memory-grant
-stall that looked like a hang, a case-insensitive filesystem deleting a stylesheet, a view
-that could never return a row, a lint fix that introduced a render loop. The recovery is
-usually the interesting part.
 
 ---
 
